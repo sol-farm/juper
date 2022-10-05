@@ -249,6 +249,7 @@ pub fn new_jupiter_swap_ix(
     }
 }
 
+/// wraps the instruction data, and instruction accounts required by an AnyIx instruction
 pub struct AnyIxArgs {
     pub accounts: Vec<AccountMeta>,
     pub data: Vec<u8>,

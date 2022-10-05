@@ -1,6 +1,6 @@
 # juper
 
-opinionated rewrite of `mvines/rust-jup-ag`.
+opinionated rewrite of `mvines/rust-jup-ag`, with a built-in route-cache, and compact instruction encoding for usage with [AnyIx](https://github.com/bonedaddy/anyix/).
 
 # crates
 
