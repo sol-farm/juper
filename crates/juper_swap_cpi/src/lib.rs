@@ -410,7 +410,7 @@ impl JupiterIx {
                 assert!(dest_token_account.owner.eq(&signer));
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: mer_swap.to_account_metas(Some(true)),
+                    accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
@@ -442,7 +442,7 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: mer_swap.to_account_metas(Some(true)),
+                    accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
@@ -469,7 +469,7 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: mer_swap.to_account_metas(Some(true)),
+                    accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
@@ -498,7 +498,7 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: mer_swap.to_account_metas(Some(true)),
+                    accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
@@ -526,7 +526,7 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: mer_swap.to_account_metas(Some(true)),
+                    accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
@@ -556,7 +556,7 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: mer_swap.to_account_metas(Some(true)),
+                    accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
@@ -587,7 +587,7 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: ray_swap.to_account_metas(Some(true)),
+                    accounts: ray_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, ray_swap.to_account_infos(), false)
@@ -618,7 +618,7 @@ impl JupiterIx {
                 assert!(dest_token_account.owner.eq(&signer));
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: ray_swap.to_account_metas(Some(true)),
+                    accounts: ray_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, ray_swap.to_account_infos(), false)
@@ -650,7 +650,7 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: whirlpool_swap.to_account_metas(Some(true)),
+                    accounts: whirlpool_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, whirlpool_swap.to_account_infos(), false)
@@ -684,7 +684,7 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: serum_swap.to_account_metas(Some(true)),
+                    accounts: serum_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, serum_swap.to_account_infos(), false)
@@ -704,7 +704,7 @@ impl JupiterIx {
                 let ix_data = instructions::token_ledger::SetTokenLedger {}.data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: token_ledger.to_account_metas(Some(true)),
+                    accounts: token_ledger.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, token_ledger.to_account_infos(), true)
@@ -734,26 +734,29 @@ impl JupiterIx {
                 .data();
                 let mut ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: saber_swap.to_account_metas(Some(true)),
+                    accounts: saber_swap.to_account_metas(None),
                     data: ix_data,
                 };
                 (ix, saber_swap.to_account_infos(), false)
             }
         };
-
-        ix.accounts.iter_mut().for_each(|acct| {
-            // we need to do this because the encoded transactions
-            // from anyix will override the signer field
-            if acct.pubkey.eq(&signer) {
-                acct.is_signer = true;
-            }
-        });
+        if !skip_signer {
+            ix.accounts.iter_mut().for_each(|acct| {
+                // we need to do this because the encoded transactions
+                // from anyix will override the signer field
+                if acct.pubkey.eq(&signer) {
+                    acct.is_signer = true;
+                }
+            });
+        }
         if !skip_signer {
             if let Some(seeds) = seeds {
+                msg!("invoking signed");
                 anchor_lang::solana_program::program::invoke_signed(&ix, &account_infos[..], seeds)
                     .unwrap();
             }
         } else {
+            msg!("invoking unsigned");
             anchor_lang::solana_program::program::invoke(&ix, &account_infos[..]).unwrap();
         }
     }
