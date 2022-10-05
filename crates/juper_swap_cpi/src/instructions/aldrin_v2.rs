@@ -1,5 +1,5 @@
 use crate::Side;
-use borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{self, BorshSerialize};
 /// Instruction.
 pub struct AldrinV2Swap {
     pub _in_amount: Option<u64>,

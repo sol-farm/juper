@@ -6,18 +6,21 @@ use crate::{
 use anchor_lang::solana_program::pubkey::Pubkey;
 use anchor_lang::InstructionData;
 use anchor_lang::{
-    prelude::AccountMeta, solana_program::instruction::InstructionError, Accounts, ToAccountMetas,
+    prelude::AccountMeta, solana_program::instruction::InstructionError, ToAccountMetas,
 };
 use anyhow::{anyhow, Result};
 use juper_swap_cpi::{JupiterIx, SwapInputs};
 use once_cell::sync::Lazy;
-use solana_client::rpc_client::{serialize_and_encode, RpcClient};
+use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_sdk::instruction::Instruction;
 use solana_sdk::transaction::Transaction;
-use solana_sdk::{commitment_config::CommitmentConfig, message::SanitizedMessage, signer::Signer};
+use solana_sdk::{message::SanitizedMessage, signer::Signer};
 use solana_transaction_status::UiTransactionEncoding;
-use static_pubkey::static_pubkey;
+
+#[cfg(test)]
+use solana_client::rpc_client::serialize_and_encode;
+
 use std::sync::Arc;
 
 pub const DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
@@ -162,8 +165,7 @@ pub fn new_anyix_swap_with_quote(
         accounts.extend_from_slice(
             &any_ix_args
                 .iter()
-                .map(|ix| ix.accounts.clone())
-                .flatten()
+                .flat_map(|ix| ix.accounts.clone())
                 .collect::<Vec<_>>()[..],
         );
         let ix = Instruction {
@@ -179,7 +181,7 @@ pub fn new_anyix_swap_with_quote(
             serialize_and_encode(&tx, UiTransactionEncoding::Base64).unwrap()
         );
 
-        tx.sign(&vec![&*payer], rpc.get_latest_blockhash()?);
+        tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
         log::info!("sending jupiter swap ix");
         if skip_preflight {
             match rpc.send_transaction_with_config(
@@ -224,7 +226,7 @@ pub fn new_anyix_swap(
     max_tries: usize,
     allowed_market_names: Option<Vec<String>>,
 ) -> Result<()> {
-    let mut market_list: Vec<String> = if let Some(list) = allowed_market_names {
+    let market_list: Vec<String> = if let Some(list) = allowed_market_names {
         list
     } else {
         DEFAULT_MARKET_LIST.clone()
@@ -235,8 +237,8 @@ pub fn new_anyix_swap(
         minfo.to_owned()
     })
     .collect();
-    let mut quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
-    let mut routes = quoter
+    let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
+    let routes = quoter
         .lookup_routes2(input_amount, false, Slippage::FifteenBip, FeeBps::Zero)?
         .iter_mut()
         .filter_map(|quote| {

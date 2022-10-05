@@ -13,7 +13,7 @@ pub const JUPITER_V3_AGG_ID: Pubkey = static_pubkey!("JUP3c2Uh3WA4Ng34tw6kPd2G4C
 pub const ID: Pubkey = JUPITER_V3_AGG_ID;
 
 use anchor_lang::{prelude::*, InstructionData};
-use anyix;
+
 use solana_program::{instruction::Instruction, program_pack::Pack};
 use std::collections::BTreeMap;
 
@@ -67,17 +67,17 @@ pub fn process_jupiter_instruction(input: &[u8]) -> Result<(JupiterIx, SwapInput
     if input.len() > 8 {
         let (ix_data, inputs) = input.split_at(8);
         let jupiter_ix: JupiterIx = TryFrom::try_from(ix_data)?;
-        return Ok((jupiter_ix, jupiter_ix.get_swap_inputs(inputs)?));
+        Ok((jupiter_ix, jupiter_ix.get_swap_inputs(inputs)?))
     } else {
         let jupiter_ix: JupiterIx = TryFrom::try_from(input)?;
-        return Ok((
+        Ok((
             jupiter_ix,
             SwapInputs {
                 input_amount: None,
                 min_output: 0,
                 side: 0,
             },
-        ));
+        ))
     }
 }
 
@@ -133,7 +133,7 @@ impl SwapInputs {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum JupiterIx {
     TokenSwap = 0_u8,
@@ -201,35 +201,35 @@ impl TryFrom<&[u8]> for JupiterIx {
         }
         let ix_data = &value[0..8];
         if ix_data.eq(&MERCURIAL_EXCHANGE) {
-            return Ok(Self::MercurialExchange);
+            Ok(Self::MercurialExchange)
         } else if ix_data.eq(&SABER_SWAP) {
-            return Ok(Self::Saber);
+            Ok(Self::Saber)
         } else if ix_data.eq(&SERUM_SWAP) {
-            return Ok(Self::Serum);
+            Ok(Self::Serum)
         } else if ix_data.eq(&TOKEN_SWAP) {
-            return Ok(Self::TokenSwap);
+            Ok(Self::TokenSwap)
         } else if ix_data.eq(&STEP_TOKEN_SWAP) {
             msg!("step unsupported");
-            return Err(ProgramError::InvalidInstructionData);
+            Err(ProgramError::InvalidInstructionData)
         } else if ix_data.eq(&CROPPER_TOKEN_SWAP) {
-            return Ok(Self::CropperTokenSwap);
+            Ok(Self::CropperTokenSwap)
         } else if ix_data.eq(&RAYDIUM_SWAP) {
-            return Ok(Self::RaydiumSwap);
+            Ok(Self::RaydiumSwap)
         } else if ix_data.eq(&RAYDIUM_SWAP_V2) {
-            return Ok(Self::RaydiumSwapV2);
+            Ok(Self::RaydiumSwapV2)
         } else if ix_data.eq(&CREMA_TOKEN_SWAP) {
             msg!("crema unsupported");
-            return Err(ProgramError::InvalidInstructionData);
+            Err(ProgramError::InvalidInstructionData)
         } else if ix_data.eq(&LIFINITY_TOKEN_SWAP) {
-            return Ok(Self::LifinityTokenSwap);
+            Ok(Self::LifinityTokenSwap)
         } else if ix_data.eq(&CYKURA_SWAP) {
-            return Ok(Self::CykuraTokenSwap);
+            Ok(Self::CykuraTokenSwap)
         } else if ix_data.eq(&WHIRLPOOL_SWAP) {
-            return Ok(Self::Whirlpool);
+            Ok(Self::Whirlpool)
         } else if ix_data.eq(&SET_TOKEN_LEDGER) {
-            return Ok(Self::SetTokenLedger);
+            Ok(Self::SetTokenLedger)
         } else {
-            return Err(ProgramError::InvalidInstructionData);
+            Err(ProgramError::InvalidInstructionData)
         }
     }
 }
@@ -246,7 +246,7 @@ impl JupiterIx {
                 }),
                 Err(err) => {
                     msg!("failed to parse token swap {:#?}", err);
-                    return Err(ProgramError::InvalidInstructionData.into());
+                    Err(ProgramError::InvalidInstructionData.into())
                 }
             },
             JupiterIx::AldrinV2Swap => {
@@ -258,7 +258,7 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse aldrinv2 swap {:#?}", err);
-                        return Err(ProgramError::InvalidInstructionData.into());
+                        Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
             }
@@ -271,7 +271,7 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse cropper swap {:#?}", err);
-                        return Err(ProgramError::InvalidInstructionData.into());
+                        Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
             }
@@ -284,7 +284,7 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse cykrua swap {:#?}", err);
-                        return Err(ProgramError::InvalidInstructionData.into());
+                        Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
             }
@@ -297,7 +297,7 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse lifinity swap {:#?}", err);
-                        return Err(ProgramError::InvalidInstructionData.into());
+                        Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
             }
@@ -310,7 +310,7 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse mercurial swap {:#?}", err);
-                        return Err(ProgramError::InvalidInstructionData.into());
+                        Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
             }
@@ -323,7 +323,7 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse ray swap {:#?}", err);
-                        return Err(ProgramError::InvalidInstructionData.into());
+                        Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
             }
@@ -336,7 +336,7 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse rayv2 swap {:#?}", err);
-                        return Err(ProgramError::InvalidInstructionData.into());
+                        Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
             }
@@ -349,7 +349,7 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse whirlpool swap {:#?}", err);
-                        return Err(ProgramError::InvalidInstructionData.into());
+                        Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
             }
@@ -361,7 +361,7 @@ impl JupiterIx {
                 }),
                 Err(err) => {
                     msg!("failed to parse serum swap {:#?}", err);
-                    return Err(ProgramError::InvalidInstructionData.into());
+                    Err(ProgramError::InvalidInstructionData.into())
                 }
             },
             JupiterIx::Saber => match instructions::saber::SaberSwap::try_from_slice(data) {
@@ -372,7 +372,7 @@ impl JupiterIx {
                 }),
                 Err(err) => {
                     msg!("failed to parse saber swap {:#?}", err);
-                    return Err(ProgramError::InvalidInstructionData.into());
+                    Err(ProgramError::InvalidInstructionData.into())
                 }
             },
             JupiterIx::SetTokenLedger => Ok(Default::default()),
@@ -408,7 +408,7 @@ impl JupiterIx {
                     spl_token::state::Account::unpack(&mer_swap.destination.data.borrow()).unwrap();
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
@@ -440,7 +440,7 @@ impl JupiterIx {
                     _side: side,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
@@ -467,7 +467,7 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
@@ -496,7 +496,7 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
@@ -524,7 +524,7 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
@@ -554,7 +554,7 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: mer_swap.to_account_metas(None),
                     data: ix_data,
@@ -585,7 +585,7 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: ray_swap.to_account_metas(None),
                     data: ix_data,
@@ -616,7 +616,7 @@ impl JupiterIx {
                 .unwrap();
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: ray_swap.to_account_metas(None),
                     data: ix_data,
@@ -648,7 +648,7 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: whirlpool_swap.to_account_metas(None),
                     data: ix_data,
@@ -682,7 +682,7 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: serum_swap.to_account_metas(None),
                     data: ix_data,
@@ -690,7 +690,7 @@ impl JupiterIx {
                 (ix, serum_swap.to_account_infos(), false)
             }
             Self::SetTokenLedger => {
-                let mut token_ledger = accounts::SetTokenLedger::try_accounts(
+                let token_ledger = accounts::SetTokenLedger::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
                     &[],
@@ -702,7 +702,7 @@ impl JupiterIx {
                         .unwrap();
                 assert!(token_account.owner.eq(&signer));
                 let ix_data = instructions::token_ledger::SetTokenLedger {}.data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: token_ledger.to_account_metas(None),
                     data: ix_data,
@@ -732,7 +732,7 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut ix = Instruction {
+                let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: saber_swap.to_account_metas(None),
                     data: ix_data,

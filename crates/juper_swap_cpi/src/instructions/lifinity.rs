@@ -1,5 +1,4 @@
-use crate::Side;
-use borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{self, BorshSerialize};
 
 /// Instruction.
 pub struct LifinityTokenSwap {

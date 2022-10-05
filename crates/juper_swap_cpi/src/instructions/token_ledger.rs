@@ -1,18 +1,17 @@
-use crate::Side;
-use borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{self, BorshSerialize};
 
 /// Instruction.
 pub struct SetTokenLedger;
 impl borsh::ser::BorshSerialize for SetTokenLedger {
     fn serialize<W: borsh::maybestd::io::Write>(
         &self,
-        writer: &mut W,
+        _writer: &mut W,
     ) -> ::core::result::Result<(), borsh::maybestd::io::Error> {
         Ok(())
     }
 }
 impl borsh::de::BorshDeserialize for SetTokenLedger {
-    fn deserialize(buf: &mut &[u8]) -> ::core::result::Result<Self, borsh::maybestd::io::Error> {
+    fn deserialize(_buf: &mut &[u8]) -> ::core::result::Result<Self, borsh::maybestd::io::Error> {
         Ok(Self {})
     }
 }

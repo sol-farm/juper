@@ -1,5 +1,4 @@
-use crate::Side;
-use borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{self, BorshSerialize};
 
 pub struct TokenSwap {
     pub _in_amount: Option<u64>,

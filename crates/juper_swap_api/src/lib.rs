@@ -1,12 +1,6 @@
 use crate::api::JupAPI;
-use solana_sdk::compute_budget::ComputeBudgetInstruction;
-use solana_sdk::instruction::Instruction;
-use std::sync::Arc;
 
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    commitment_config::CommitmentLevel, pubkey::Pubkey, signer::Signer, transaction::Transaction,
-};
+use solana_sdk::{pubkey::Pubkey, transaction::Transaction};
 
 //pub mod core;
 pub mod anyix;
