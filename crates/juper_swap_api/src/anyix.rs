@@ -1,7 +1,7 @@
 //! provides integration of anyix and v2 vaults
 use crate::{
     slippage::{FeeBps, Slippage},
-    types::SwapConfig,
+    types::{Quote, SwapConfig},
 };
 use anchor_lang::solana_program::pubkey::Pubkey;
 use anchor_lang::InstructionData;
@@ -10,6 +10,7 @@ use anchor_lang::{
 };
 use anyhow::{anyhow, Result};
 use juper_swap_cpi::{JupiterIx, SwapInputs};
+use once_cell::sync::Lazy;
 use solana_client::rpc_client::{serialize_and_encode, RpcClient};
 use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_sdk::instruction::Instruction;
@@ -18,6 +19,15 @@ use solana_sdk::{commitment_config::CommitmentConfig, message::SanitizedMessage,
 use solana_transaction_status::UiTransactionEncoding;
 use static_pubkey::static_pubkey;
 use std::sync::Arc;
+
+pub const DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
+    vec![
+        "orca (whirlpools)".to_string(),
+        "orca".to_string(),
+        "raydium".to_string(),
+        "saner".to_string(),
+    ]
+});
 
 pub fn new_anyix_swap(
     rpc: &Arc<RpcClient>,
@@ -30,19 +40,29 @@ pub fn new_anyix_swap(
     output_mint: Pubkey,
     input_amount: f64,
     skip_preflight: bool,
+    max_tries: usize,
+    allowed_market_names: Option<Vec<String>>,
 ) -> Result<()> {
+    let market_list = if let Some(list) = allowed_market_names {
+        list
+    } else {
+        DEFAULT_MARKET_LIST.clone()
+    };
     let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
     let mut routes = quoter
         .lookup_routes2(input_amount, false, Slippage::FifteenBip, FeeBps::Zero)?
         .into_iter()
         .filter(|quote| {
             for market_info in quote.market_infos.iter() {
+                if market_list.contains(&market_info.label) {
+                    continue;
+                }
                 if market_info.label.eq_ignore_ascii_case("orca (whirlpools)")
                     || market_info.label.eq_ignore_ascii_case("orca")
                     || market_info.label.eq_ignore_ascii_case("raydium")
                     || market_info.label.eq_ignore_ascii_case("saber")
-                    || market_info.label.eq_ignore_ascii_case("mercurial")
-                    || market_info.label.eq_ignore_ascii_case("lifinity")
+                //|| market_info.label.eq_ignore_ascii_case("mercurial")
+                //|| market_info.label.eq_ignore_ascii_case("lifinity")
                 {
                     continue;
                 } else {
@@ -56,180 +76,190 @@ pub fn new_anyix_swap(
     if routes.is_empty() {
         return Err(anyhow!("failed to find any routes"));
     }
-    let swap_route = std::mem::take(&mut routes[0]);
-
-    #[cfg(test)]
-    swap_route
-        .market_infos
-        .iter()
-        .enumerate()
-        .for_each(|(idx, minfo)| {
-            println!(
-                "market info {}. coin {} pc {}",
-                idx, minfo.input_mint, minfo.output_mint
-            );
-        });
-
-    let jup_client = crate::Client::new();
-    let swap_config = jup_client.swap_with_config(
-        swap_route,
-        vault_pda,
-        SwapConfig {
-            wrap_unwrap_sol: Some(false),
-            ..Default::default()
-        },
-    )?;
-
-    let crate::types::Swap {
-        setup,
-        swap,
-        cleanup,
-    } = swap_config;
-    if setup.is_some() {
-        log::info!("setup required");
-    }
-
-    for tx in [setup, Some(swap), cleanup]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .iter_mut()
-    {
-        // create the legacy and sanitized messages used for processesing
-        let sanitized_msg = SanitizedMessage::Legacy(tx.message.clone());
-        let mut instructions = Vec::with_capacity(tx.message.instructions.len());
-
-        instructions.append(
-            &mut tx
-                .message
-                .instructions
-                .iter_mut()
-                .map(|compiled_ix| {
-                    Instruction::new_with_bytes(
-                        *sanitized_msg
-                            .get_account_key(compiled_ix.program_id_index.into())
-                            .ok_or(InstructionError::MissingAccount)
-                            .unwrap(),
-                        &compiled_ix.data,
-                        compiled_ix
-                            .accounts
-                            .iter()
-                            .map(|account_index| {
-                                let account_index = *account_index as usize;
-                                Ok(AccountMeta {
-                                    is_signer: sanitized_msg.is_signer(account_index),
-                                    is_writable: sanitized_msg.is_writable(account_index),
-                                    pubkey: *sanitized_msg
-                                        .get_account_key(account_index)
-                                        .ok_or(InstructionError::MissingAccount)?,
-                                })
-                            })
-                            .collect::<Result<Vec<AccountMeta>, InstructionError>>()
-                            .unwrap(),
-                    )
-                })
-                .collect::<Vec<_>>(),
-        );
-        // ensure all instructions invoke a program_id that is whitelisted
-        for ix in instructions.iter() {
-            // prevent a rogue api from returning programs that are not the ata or jupiter progarm
-            if ix.program_id.ne(&spl_associated_token_account::ID)
-                && ix.program_id.ne(&juper_swap_cpi::JUPITER_V3_AGG_ID)
-            {
-                return Err(anyhow!("invalid program id {}", ix.program_id));
-            }
-        }
-        let any_ix_args = instructions
-            .iter_mut()
-            .filter_map(|ix| {
-                // first set any signer accounts as non signers
-                // this is to prevent txn signing issues where the swap ix requires a pda to sign
-                //
-                // however if the instruction is for the ATA program we dont do this
-                if ix.program_id.eq(&juper_swap_cpi::JUPITER_V3_AGG_ID) {
-                    ix.accounts = ix
-                        .accounts
-                        .iter_mut()
-                        .map(|account| {
-                            account.is_signer = false;
-                            account.clone()
-                        })
-                        .collect();
-                    let (jup_ix, swap_input) =
-                        match juper_swap_cpi::process_jupiter_instruction(&ix.data[..]) {
-                            Ok(ix) => ix,
-                            Err(err) => {
-                                log::error!("failed to process jupiter ix {:#?}", err);
-                                return None;
-                            }
-                        };
-                    if let Ok(args) = new_jupiter_swap_ix_data(ix.clone(), jup_ix, swap_input) {
-                        Some(args)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        let mut accounts = juper_swap_cpi::accounts::JupiterSwap {
-            vault,
-            authority: payer.pubkey(),
-            jupiter_program: juper_swap_cpi::JUPITER_V3_AGG_ID,
-            management,
-        }
-        .to_account_metas(Some(true));
-        let any_ix = ::anyix::AnyIx {
-            num_instructions: any_ix_args.len() as u8,
-            instruction_data_sizes: any_ix_args.iter().map(|ix| ix.data.len() as u8).collect(),
-            instruction_account_counts: any_ix_args
-                .iter()
-                .map(|ix| ix.accounts.len() as u8)
-                .collect(),
-            instruction_datas: any_ix_args.iter().map(|ix| ix.data.clone()).collect(),
-        }
-        .pack()?;
-        accounts.extend_from_slice(
-            &any_ix_args
-                .iter()
-                .map(|ix| ix.accounts.clone())
-                .flatten()
-                .collect::<Vec<_>>()[..],
-        );
-        let ix = Instruction {
-            program_id: anyix_program,
-            accounts,
-            data: juper_swap_cpi::instructions::JupiterSwapArgs { input_data: any_ix }.data(),
-        };
-        let mut tx = Transaction::new_with_payer(&[ix], Some(&payer.pubkey()));
-
-        #[cfg(test)]
-        println!(
-            "encoded jupiter tx {}",
-            serialize_and_encode(&tx, UiTransactionEncoding::Base64).unwrap()
-        );
-
-        tx.sign(&vec![&*payer], rpc.get_latest_blockhash()?);
-        log::info!("sending jupiter swap ix");
-        if skip_preflight {
-            match rpc.send_transaction_with_config(
-                &tx,
-                RpcSendTransactionConfig {
-                    skip_preflight,
+    for route in routes.iter().take(max_tries) {
+        let swap_fn = |swap_route: Quote| -> Result<()> {
+            let jup_client = crate::Client::new();
+            let swap_config = jup_client.swap_with_config(
+                swap_route,
+                vault_pda,
+                SwapConfig {
+                    wrap_unwrap_sol: Some(false),
                     ..Default::default()
                 },
-            ) {
-                Ok(sig) => log::info!("sent jupiter swap ix {}", sig),
-                Err(err) => log::error!("failed to send jupiter swap ix {:#?}", err),
+            )?;
+
+            let crate::types::Swap {
+                setup,
+                swap,
+                cleanup,
+            } = swap_config;
+            if setup.is_some() {
+                log::info!("setup required");
             }
-        } else {
-            match rpc.send_and_confirm_transaction(&tx) {
-                Ok(sig) => log::info!("sent jupiter swap ix {}", sig),
-                Err(err) => log::error!("failed to send jupiter swap ix {:#?}", err),
+
+            for tx in [setup, Some(swap), cleanup]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .iter_mut()
+            {
+                // create the legacy and sanitized messages used for processesing
+                let sanitized_msg = SanitizedMessage::Legacy(tx.message.clone());
+                let mut instructions = Vec::with_capacity(tx.message.instructions.len());
+
+                instructions.append(
+                    &mut tx
+                        .message
+                        .instructions
+                        .iter_mut()
+                        .map(|compiled_ix| {
+                            Instruction::new_with_bytes(
+                                *sanitized_msg
+                                    .get_account_key(compiled_ix.program_id_index.into())
+                                    .ok_or(InstructionError::MissingAccount)
+                                    .unwrap(),
+                                &compiled_ix.data,
+                                compiled_ix
+                                    .accounts
+                                    .iter()
+                                    .map(|account_index| {
+                                        let account_index = *account_index as usize;
+                                        Ok(AccountMeta {
+                                            is_signer: sanitized_msg.is_signer(account_index),
+                                            is_writable: sanitized_msg.is_writable(account_index),
+                                            pubkey: *sanitized_msg
+                                                .get_account_key(account_index)
+                                                .ok_or(InstructionError::MissingAccount)?,
+                                        })
+                                    })
+                                    .collect::<Result<Vec<AccountMeta>, InstructionError>>()
+                                    .unwrap(),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+                // ensure all instructions invoke a program_id that is whitelisted
+                for ix in instructions.iter() {
+                    // prevent a rogue api from returning programs that are not the ata or jupiter progarm
+                    if ix.program_id.ne(&spl_associated_token_account::ID)
+                        && ix.program_id.ne(&juper_swap_cpi::JUPITER_V3_AGG_ID)
+                    {
+                        return Err(anyhow!("invalid program id {}", ix.program_id));
+                    }
+                }
+                let any_ix_args = instructions
+                    .iter_mut()
+                    .filter_map(|ix| {
+                        // first set any signer accounts as non signers
+                        // this is to prevent txn signing issues where the swap ix requires a pda to sign
+                        //
+                        // however if the instruction is for the ATA program we dont do this
+                        if ix.program_id.eq(&juper_swap_cpi::JUPITER_V3_AGG_ID) {
+                            ix.accounts = ix
+                                .accounts
+                                .iter_mut()
+                                .map(|account| {
+                                    account.is_signer = false;
+                                    account.clone()
+                                })
+                                .collect();
+                            let (jup_ix, swap_input) =
+                                match juper_swap_cpi::process_jupiter_instruction(&ix.data[..]) {
+                                    Ok(ix) => ix,
+                                    Err(err) => {
+                                        log::error!("failed to process jupiter ix {:#?}", err);
+                                        return None;
+                                    }
+                                };
+                            if let Ok(args) =
+                                new_jupiter_swap_ix_data(ix.clone(), jup_ix, swap_input)
+                            {
+                                Some(args)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let mut accounts = juper_swap_cpi::accounts::JupiterSwap {
+                    vault,
+                    authority: payer.pubkey(),
+                    jupiter_program: juper_swap_cpi::JUPITER_V3_AGG_ID,
+                    management,
+                }
+                .to_account_metas(Some(true));
+                let any_ix = ::anyix::AnyIx {
+                    num_instructions: any_ix_args.len() as u8,
+                    instruction_data_sizes: any_ix_args
+                        .iter()
+                        .map(|ix| ix.data.len() as u8)
+                        .collect(),
+                    instruction_account_counts: any_ix_args
+                        .iter()
+                        .map(|ix| ix.accounts.len() as u8)
+                        .collect(),
+                    instruction_datas: any_ix_args.iter().map(|ix| ix.data.clone()).collect(),
+                }
+                .pack()?;
+                accounts.extend_from_slice(
+                    &any_ix_args
+                        .iter()
+                        .map(|ix| ix.accounts.clone())
+                        .flatten()
+                        .collect::<Vec<_>>()[..],
+                );
+                let ix = Instruction {
+                    program_id: anyix_program,
+                    accounts,
+                    data: juper_swap_cpi::instructions::JupiterSwapArgs { input_data: any_ix }
+                        .data(),
+                };
+                let mut tx = Transaction::new_with_payer(&[ix], Some(&payer.pubkey()));
+
+                #[cfg(test)]
+                println!(
+                    "encoded jupiter tx {}",
+                    serialize_and_encode(&tx, UiTransactionEncoding::Base64).unwrap()
+                );
+
+                tx.sign(&vec![&*payer], rpc.get_latest_blockhash()?);
+                log::info!("sending jupiter swap ix");
+                if skip_preflight {
+                    match rpc.send_transaction_with_config(
+                        &tx,
+                        RpcSendTransactionConfig {
+                            skip_preflight,
+                            ..Default::default()
+                        },
+                    ) {
+                        Ok(sig) => log::info!("sent jupiter swap ix {}", sig),
+                        Err(err) => {
+                            let error_msg = format!("failed to send jupiter swap ix {:#?}", err);
+                            log::error!("{}", error_msg);
+                            return Err(anyhow!("{}", error_msg));
+                        }
+                    }
+                } else {
+                    match rpc.send_and_confirm_transaction(&tx) {
+                        Ok(sig) => log::info!("sent jupiter swap ix {}", sig),
+                        Err(err) => {
+                            let error_msg = format!("failed to send jupiter swap ix {:#?}", err);
+                            log::error!("{}", error_msg);
+                            return Err(anyhow!("{}", error_msg));
+                        }
+                    }
+                }
             }
+            Ok(())
+        };
+        // if the swap succeeds, exit the loop early
+        if swap_fn(route.clone()).is_ok() {
+            break;
         }
     }
+
     Ok(())
 }
 
@@ -324,6 +354,8 @@ mod test {
             usdh_mint,
             1.0,
             false,
+            2,
+            None,
         )
         .unwrap();
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -338,6 +370,8 @@ mod test {
             msol_mint,
             1.0,
             false,
+            2,
+            Some(DEFAULT_MARKET_LIST.to_vec()),
         )
         .unwrap();
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -352,6 +386,8 @@ mod test {
             usdh_mint,
             1.0,
             false,
+            2,
+            None,
         )
         .unwrap();
     }
