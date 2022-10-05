@@ -224,25 +224,32 @@ pub fn new_anyix_swap(
     max_tries: usize,
     allowed_market_names: Option<Vec<String>>,
 ) -> Result<()> {
-    let market_list = if let Some(list) = allowed_market_names {
+    let mut market_list: Vec<String> = if let Some(list) = allowed_market_names {
         list
     } else {
         DEFAULT_MARKET_LIST.clone()
-    };
-    let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
+    }
+    .iter_mut()
+    .map(|minfo| {
+        minfo.make_ascii_lowercase();
+        minfo.to_owned()
+    })
+    .collect();
+    let mut quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
     let mut routes = quoter
         .lookup_routes2(input_amount, false, Slippage::FifteenBip, FeeBps::Zero)?
-        .into_iter()
-        .filter(|quote| {
-            for market_info in quote.market_infos.iter() {
+        .iter_mut()
+        .filter_map(|quote| {
+            for market_info in (*quote).market_infos.iter_mut() {
+                market_info.label.make_ascii_lowercase();
                 if market_list.contains(&market_info.label) {
                     continue;
                 } else {
                     println!("ignoring market {}", market_info.label);
-                    return false;
+                    return None;
                 }
             }
-            true
+            Some(quote.clone())
         })
         .collect::<Vec<_>>();
     if routes.is_empty() {
@@ -362,8 +369,7 @@ mod test {
             false,
             2,
             None,
-        )
-        .unwrap();
+        );
         std::thread::sleep(std::time::Duration::from_secs(1));
         new_anyix_swap(
             &rpc,
@@ -378,8 +384,7 @@ mod test {
             false,
             2,
             Some(DEFAULT_MARKET_LIST.to_vec()),
-        )
-        .unwrap();
+        );
         std::thread::sleep(std::time::Duration::from_secs(1));
         new_anyix_swap(
             &rpc,
@@ -394,7 +399,6 @@ mod test {
             false,
             2,
             None,
-        )
-        .unwrap();
+        );
     }
 }
