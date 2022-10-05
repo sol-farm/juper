@@ -16,7 +16,6 @@ use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_sdk::instruction::Instruction;
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{message::SanitizedMessage, signer::Signer};
-use solana_transaction_status::UiTransactionEncoding;
 
 #[cfg(test)]
 use solana_client::rpc_client::serialize_and_encode;
@@ -178,7 +177,11 @@ pub fn new_anyix_swap_with_quote(
         #[cfg(test)]
         println!(
             "encoded jupiter tx {}",
-            serialize_and_encode(&tx, UiTransactionEncoding::Base64).unwrap()
+            serialize_and_encode(
+                &tx,
+                solana_transaction_status::UiTransactionEncoding::Base64
+            )
+            .unwrap()
         );
 
         tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
