@@ -47,12 +47,8 @@ pub fn process_instructions<'info>(
         let jupiter_ix: JupiterIx = From::from(instruction_datas[idx as usize][0]);
         msg!("unpacking swap inputs");
         let swap_inputs = SwapInputs::new().unpack(&instruction_datas[idx as usize][1..]);
-        msg!("validating");
         //assert!(jupiter_ix.validate(&accounts[..], wanted_token_owner));
         msg!("executing");
-        if idx == 0 {
-            continue;
-        }
         jupiter_ix.execute(
             accounts,
             seeds,
