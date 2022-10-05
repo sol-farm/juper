@@ -57,6 +57,8 @@ pub fn new_anyix_swap(
         return Err(anyhow!("failed to find any routes"));
     }
     let swap_route = std::mem::take(&mut routes[0]);
+
+    #[cfg(test)]
     swap_route
         .market_infos
         .iter()
@@ -67,6 +69,7 @@ pub fn new_anyix_swap(
                 idx, minfo.input_mint, minfo.output_mint
             );
         });
+
     let jup_client = crate::Client::new();
     let swap_config = jup_client.swap_with_config(
         swap_route,
@@ -131,9 +134,9 @@ pub fn new_anyix_swap(
         for ix in instructions.iter() {
             // prevent a rogue api from returning programs that are not the ata or jupiter progarm
             if ix.program_id.ne(&spl_associated_token_account::ID)
-                && !ix.program_id.ne(&juper_swap_cpi::JUPITER_V3_AGG_ID)
+                && ix.program_id.ne(&juper_swap_cpi::JUPITER_V3_AGG_ID)
             {
-                return Err(anyhow!("invalid program id"));
+                return Err(anyhow!("invalid program id {}", ix.program_id));
             }
         }
         let any_ix_args = instructions
@@ -200,10 +203,13 @@ pub fn new_anyix_swap(
             data: juper_swap_cpi::instructions::JupiterSwapArgs { input_data: any_ix }.data(),
         };
         let mut tx = Transaction::new_with_payer(&[ix], Some(&payer.pubkey()));
+
+        #[cfg(test)]
         println!(
             "encoded jupiter tx {}",
             serialize_and_encode(&tx, UiTransactionEncoding::Base64).unwrap()
         );
+
         tx.sign(&vec![&*payer], rpc.get_latest_blockhash()?);
         log::info!("sending jupiter swap ix");
         if skip_preflight {
@@ -263,4 +269,89 @@ pub fn new_jupiter_swap_ix_data(
         data,
         accounts: swap_api_ix.accounts,
     })
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use anchor_lang::solana_program;
+    use simplelog::*;
+    use solana_sdk::signature::{self, Keypair};
+    use solana_sdk::signer::Signer;
+    use static_pubkey::static_pubkey;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::sync::Arc;
+    use std::{fs::File, str::FromStr};
+    #[test]
+    #[allow(unused_must_use)]
+    fn test_new_anyix_swap() {
+        TermLogger::init(
+            LevelFilter::Info,
+            ConfigBuilder::new()
+                .set_location_level(LevelFilter::Error)
+                .build(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        );
+        let rpc = Arc::new(RpcClient::new("https://ssc-dao.genesysgo.net".to_string()));
+        let orca_mint = static_pubkey!("orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE");
+        let msol_mint = static_pubkey!("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
+        let hbb_mint = static_pubkey!("HBB111SCo9jkCejsZfz8Ec8nH7T6THF8KEKSnvwT6XK6");
+        let mnde_mint = static_pubkey!("MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey");
+        let usdh_mint = static_pubkey!("USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX");
+        /* simiulate a USDH-mSOL Whirlpool swap
+
+        * this gives ORCA, HBB, MNDE rewards + fees
+        * requires USDH-mSOL liquidity
+
+        */
+
+        let payer = Keypair::new();
+        let vault_pda = static_pubkey!("663B7xaCqkFKeRKbWwbzcdXoeBLwNS1k5uDFVgUkZwh9");
+        let vault = static_pubkey!("HvRLN4NtVojvM6MicHVnUWCfBZMVWY4mn147LitM27dE");
+        let management = static_pubkey!("De74LEi2qAz5Lk8XTfm7dTRrhwpJVqbCjehLZSPzKfRN");
+        let anyix_program = static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD");
+        new_anyix_swap(
+            &rpc,
+            &payer,
+            anyix_program,
+            management,
+            vault,
+            vault_pda,
+            orca_mint,
+            usdh_mint,
+            1.0,
+            false,
+        )
+        .unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        new_anyix_swap(
+            &rpc,
+            &payer,
+            anyix_program,
+            management,
+            vault,
+            vault_pda,
+            mnde_mint,
+            msol_mint,
+            1.0,
+            false,
+        )
+        .unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        new_anyix_swap(
+            &rpc,
+            &payer,
+            anyix_program,
+            management,
+            vault,
+            vault_pda,
+            hbb_mint,
+            usdh_mint,
+            1.0,
+            false,
+        )
+        .unwrap();
+    }
 }
