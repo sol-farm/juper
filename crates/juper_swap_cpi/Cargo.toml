@@ -1,7 +1,7 @@
 [package]
 name = "juper_swap_cpi"
 authors = ["Bonedaddy", "Tulip Protocol"]
-categories = ["jupiter", "solana"]
+keywords = ["jupiter", "solana"]
 description = "Jupiter Aggregator API Client"
 edition = "2021"
 license = "Apache-2.0"

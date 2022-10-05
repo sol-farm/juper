@@ -1,13 +1,13 @@
 [package]
 authors = ["Michael Vines <mvines@gmail.com", "Bonedaddy"]
-categories = ["jupiter", "solana"]
+keywords = ["jupiter", "solana"]
 description = "Jupiter Aggregator API Client"
 edition = "2021"
 license = "Apache-2.0"
 name = "juper_swap_api"
 readme = "../../README.md"
 repository = "https://github.com/bonedaddy/juper"
-version = "0.0.1"
+version = "0.0.2"
 
 [dependencies]
 base64 = "0.13"
