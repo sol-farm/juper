@@ -1,0 +1,36 @@
+[package]
+authors = ["Michael Vines <mvines@gmail.com", "Bonedaddy"]
+categories = ["jupiter", "solana"]
+description = "Jupiter Aggregator API Client"
+edition = "2021"
+license = "Apache-2.0"
+name = "juper_swap_api"
+readme = "README.md"
+repository = "https://github.com/bonedaddy/juper"
+version = "0.0.1"
+
+[dependencies]
+base64 = "0.13"
+bincode = "1"
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+solana-sdk = "1.9"
+solana-transaction-status = "1.9"
+thiserror = "1"
+tokio = "1"
+juper_swap_cpi = {path = "../juper_swap_cpi"}
+solana-client = "1.9"
+anyhow = "1"
+log = "0.4"
+spl-associated-token-account = "1"
+spl-token = "3"
+once_cell = "1"
+async-trait = "0.1"
+anchor-lang = ">=0.24"
+static-pubkey = "1.0.2"
+anyix = "0.1.1"
+
+[dev-dependencies]
+itertools = "0.10"
+tokio = {version = "1", features = ["full", "rt-multi-thread"]}

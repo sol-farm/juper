@@ -2,3 +2,5 @@
 /Cargo.lock
 .DS_Store
 *.json
+
+crates/juper_swap_api/target/
