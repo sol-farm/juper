@@ -185,24 +185,25 @@ pub fn new_anyix_swap(
     let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
     let routes = quoter
         .lookup_routes2(input_amount, false, slippage, FeeBps::Zero)?
-        .iter_mut()
-        .filter_map(|quote| {
-            for market_info in (*quote).market_infos.iter_mut() {
-                market_info.label.make_ascii_lowercase();
-                if market_list.contains(&market_info.label) {
+        .into_iter()
+        .filter(|quote| {
+            for market_info in quote.market_infos.iter() {
+                let mut label = market_info.label.clone();
+                label.make_ascii_lowercase();
+                if market_list.contains(&label) {
                     continue;
                 } else {
                     println!("ignoring market {}", market_info.label);
-                    return None;
+                    return false;
                 }
             }
-            Some(quote.clone())
+            true
         })
         .collect::<Vec<_>>();
     if routes.is_empty() {
         return Err(anyhow!("failed to find any routes"));
     }
-    for route in routes.iter().take(max_tries) {
+    for route in routes.into_iter().take(max_tries) {
         let swap_fn = |swap_route: Quote| -> Result<Signature> {
             new_anyix_swap_with_quote(
                 swap_route,
