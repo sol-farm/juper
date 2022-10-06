@@ -1,5 +1,5 @@
 [package]
-authors = ["Michael Vines <mvines@gmail.com", "Bonedaddy"]
+authors = ["Michael Vines <mvines@gmail.com", "Bonedaddy", "Tulip Protocol"]
 keywords = ["jupiter", "solana"]
 description = "Jupiter Aggregator API Client"
 edition = "2021"
