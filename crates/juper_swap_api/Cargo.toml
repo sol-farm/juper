@@ -7,7 +7,7 @@ license = "Apache-2.0"
 name = "juper_swap_api"
 readme = "../../README.md"
 repository = "https://github.com/bonedaddy/juper"
-version = "0.0.7"
+version = "0.0.8-rc1"
 
 [dependencies]
 base64 = "0.13"
@@ -19,7 +19,7 @@ solana-sdk = "1.9"
 solana-transaction-status = "1.9"
 thiserror = "1"
 tokio = "1"
-juper_swap_cpi = {path = "../juper_swap_cpi", version = "0.0.7"}
+juper_swap_cpi = {path = "../juper_swap_cpi", version = "0.0.8-rc1"}
 solana-client = "1.9"
 anyhow = "1"
 log = "0.4"
