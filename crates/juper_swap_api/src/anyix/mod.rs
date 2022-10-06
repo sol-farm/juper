@@ -10,14 +10,9 @@ use solana_client::rpc_client::RpcClient;
 
 use solana_sdk::instruction::Instruction;
 
-use solana_sdk::signer::Signer;
-
-#[cfg(test)]
-use solana_client::rpc_client::serialize_and_encode;
-
 use std::{collections::HashMap, sync::Arc};
 
-pub const DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
+pub static DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
     vec![
         "orca (whirlpools)".to_string(),
         "orca".to_string(),
@@ -113,14 +108,13 @@ mod test {
     use anchor_lang::solana_program;
     use simplelog::*;
     use solana_sdk::instruction::InstructionError;
-    use solana_sdk::signature::{self, Keypair};
-    use solana_sdk::signer::Signer;
+    use solana_sdk::signature::Keypair;
     use solana_sdk::transaction::Transaction;
     use static_pubkey::static_pubkey;
     use std::collections::HashMap;
-    use std::fs;
+
     use std::sync::Arc;
-    use std::{fs::File, str::FromStr};
+
     pub fn derive_tokena_compound_queue(vault: Pubkey, mint: Pubkey) -> (Pubkey, u8) {
         Pubkey::find_program_address(
             &[b"tokena_compound_queue", vault.as_ref(), mint.as_ref()],
@@ -147,15 +141,15 @@ mod test {
             ColorChoice::Auto,
         );
         let rpc = Arc::new(RpcClient::new("https://ssc-dao.genesysgo.net".to_string()));
-        let orca_mint = static_pubkey!("orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE");
-        let msol_mint = static_pubkey!("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
-        let hbb_mint = static_pubkey!("HBB111SCo9jkCejsZfz8Ec8nH7T6THF8KEKSnvwT6XK6");
+        let _orca_mint = static_pubkey!("orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE");
+        let _msol_mint = static_pubkey!("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
+        let _hbb_mint = static_pubkey!("HBB111SCo9jkCejsZfz8Ec8nH7T6THF8KEKSnvwT6XK6");
         let mnde_mint = static_pubkey!("MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey");
         let usdh_mint = static_pubkey!("USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX");
         let vault_pda = static_pubkey!("663B7xaCqkFKeRKbWwbzcdXoeBLwNS1k5uDFVgUkZwh9");
         let vault = static_pubkey!("HvRLN4NtVojvM6MicHVnUWCfBZMVWY4mn147LitM27dE");
-        let management = static_pubkey!("De74LEi2qAz5Lk8XTfm7dTRrhwpJVqbCjehLZSPzKfRN");
-        let anyix_program = static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD");
+        let _management = static_pubkey!("De74LEi2qAz5Lk8XTfm7dTRrhwpJVqbCjehLZSPzKfRN");
+        let _anyix_program = static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD");
         let b64_encoded_swap_ix = base64::decode("AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAoaudEwYcD83iSmOdiCYgl0FbE1EY/HTjC9O5vVR1aEHFWqc2Opgg73NeMj+N8A8YBI7KBlgAadkiYTWIQY7+9V8RhD6EtkoqBLhz59tziCckQWnJgl6UD5U8gAbmrlZLYAS5TMIJJnkcTF2Y9tnZJBMYjEdZLTelaWUxXjYxc1LQBy6joJxxNxIhqReCIF6ipi6l8dFod/NVBGlOa9DSJu5ISU5qD0vvrQhq+nyqyPEfzUf6sPd2hWARpSfIxTXxCGUV3Qo2oarR8RfanRO45fsiz96o0HIJ1mCfSLByJGBWQLj3UTm7d3XtPJYOBovoo6CwRU3hvpqEJYQE/IzLTCZ1waD1HOYC2xb6ZMp5eamugBnFs8axvo2gd01mOANYU53dHPHkhuGADDuqPZzbztsigJaTDSQgZyxNrWOAy/zmxXYyJa5D0osAqQhhSw0/YyqDhnIGj0GwDx3EdYMq7gmzQ75dsN/tO3arD+4cQKCwImHdTmOLddU/PySdwwBfo74xNweqSUKpWIXr/IcQHRrcRUO2enkrQ5Z80qSH/OUJKWKpuQ7lVrgHG91hWFUjOg8vE3WvyY/WShXVHKFExQ0POdIYrSqXHH5oP8cJLTXQbhX15dEO6iKalbaYnCU2fyQ9T66GpX3xFpsi1C4nTOMgvpYSQbxTsZEDouboxsAZm7zZUMob9Z6rKfT5aGxqXL6rHuJlQvFBgJ1Q9HioX3PftqSb72Tp8fjTN0jXGTukPmEi7RgGqM+MLi6vWxymkVBHnVH6nNSvb3qwqwbkgtxkwyjapZJyq+L06YgldeDnh+VHcaV6bxTKnkAtVK7kX3N4rKNlx7Fpp+yD9RgrKY8Abd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpGu2oNYDga4vix7P151kKaci+vDfG0APaJSmfnKJlpZ8nqtoym+YRqdZn6qX1bDrJAVznq35qhT3m2r7+nOVT4g4DaF+OkJBT5FgSHGb1p2rtx3BqoRyC+KqVKo8reHmpK9feXDkiJL2QzliBZ93nohLYkTD7z3ZjZmE+kHJx8sMGvwf3Oo0dtK8U/tuext6Xa3u+NU+95O6RRSyGRvtAdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARkeABAREgECExQVFgMEBQYCBwgXFAMJCgsCDA0ODxgBLnTPAMT8ePMSIgAAAAMBEQkCCw0LAEBCDwAAAAAAAAAAAAAAAAAIHZsMAAAAAAA=").unwrap();
         let mut orig_txn: Transaction = bincode::deserialize(&b64_encoded_swap_ix[..]).unwrap();
         let sanitized_msg = SanitizedMessage::Legacy(orig_txn.message().clone());
@@ -215,7 +209,7 @@ mod test {
         for (idx, (new, old)) in new_instruction
             .accounts
             .iter()
-            .zip((orig_instruction.accounts))
+            .zip(orig_instruction.accounts)
             .enumerate()
         {
             if idx == 21 {
