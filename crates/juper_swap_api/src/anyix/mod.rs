@@ -23,6 +23,8 @@ pub static DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
         "orca (whirlpools) (95%) + raydium (5%)".to_string(),
         "raydium (95%) + orca (5%)".to_string(),
         "orca (whirlpools) (85%) + orca (15%)".to_string(),
+        "orca (95%) + raydium (5%)".to_string(),
+        "cykura".to_string()
         //"mercurial".to_string(),
         //"lifinity".to_string(),
     ]
