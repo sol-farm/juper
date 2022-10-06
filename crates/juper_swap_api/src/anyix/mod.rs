@@ -12,6 +12,7 @@ use solana_sdk::instruction::Instruction;
 
 use std::{collections::HashMap, sync::Arc};
 
+/// todo move to regex
 pub static DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
     vec![
         "orca (whirlpools)".to_string(),
@@ -21,6 +22,7 @@ pub static DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
         "saber".to_string(),
         "orca (whirlpools) (95%) + raydium (5%)".to_string(),
         "raydium (95%) + orca (5%)".to_string()
+        "orca (whirlpools) (85%) + orca (15%)".to_srting(),
         //"mercurial".to_string(),
         //"lifinity".to_string(),
     ]
