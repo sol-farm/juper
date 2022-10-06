@@ -1,21 +1,16 @@
 pub mod swap;
-use crate::{
-    slippage::{FeeBps, Slippage},
-    types::{Quote, SwapConfig},
-};
+
 use anchor_lang::solana_program::pubkey::Pubkey;
-use anchor_lang::InstructionData;
-use anchor_lang::{
-    prelude::AccountMeta, solana_program::instruction::InstructionError, ToAccountMetas,
-};
-use anyhow::{anyhow, Result};
+
+use anchor_lang::prelude::AccountMeta;
+use anyhow::Result;
 use juper_swap_cpi::{JupiterIx, SwapInputs};
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::RpcClient;
-use solana_client::rpc_config::RpcSendTransactionConfig;
+
 use solana_sdk::instruction::Instruction;
-use solana_sdk::transaction::Transaction;
-use solana_sdk::{message::SanitizedMessage, signer::Signer};
+
+use solana_sdk::signer::Signer;
 
 #[cfg(test)]
 use solana_client::rpc_client::serialize_and_encode;
@@ -88,7 +83,7 @@ pub fn replace_accounts(
     replacements: &HashMap<Pubkey, Pubkey>,
 ) -> Result<()> {
     for account in ix.accounts.iter_mut() {
-        if let Some(new_acct) = modify_fn(account, rpc, &replacements) {
+        if let Some(new_acct) = modify_fn(account, rpc, replacements) {
             log::warn!("replacing {} with {}", account.pubkey, new_acct.pubkey);
             *account = new_acct;
         }
@@ -101,27 +96,26 @@ pub fn replace_accounts(
 /// address
 pub fn replace_by_account_pubkey(
     account: &AccountMeta,
-    rpc: &Arc<RpcClient>,
+    _rpc: &Arc<RpcClient>,
     replacements: &HashMap<Pubkey, Pubkey>,
 ) -> Option<AccountMeta> {
-    if let Some(new) = replacements.get(&account.pubkey) {
-        return Some(AccountMeta {
-            pubkey: *new,
-            is_writable: account.is_writable,
-            is_signer: account.is_signer,
-        });
-    } else {
-        return None;
-    }
+    replacements.get(&account.pubkey).map(|new| AccountMeta {
+        pubkey: *new,
+        is_writable: account.is_writable,
+        is_signer: account.is_signer,
+    })
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::anyix::test::solana_program::message::SanitizedMessage;
     use anchor_lang::solana_program;
     use simplelog::*;
+    use solana_sdk::instruction::InstructionError;
     use solana_sdk::signature::{self, Keypair};
     use solana_sdk::signer::Signer;
+    use solana_sdk::transaction::Transaction;
     use static_pubkey::static_pubkey;
     use std::collections::HashMap;
     use std::fs;
@@ -162,7 +156,6 @@ mod test {
         let vault = static_pubkey!("HvRLN4NtVojvM6MicHVnUWCfBZMVWY4mn147LitM27dE");
         let management = static_pubkey!("De74LEi2qAz5Lk8XTfm7dTRrhwpJVqbCjehLZSPzKfRN");
         let anyix_program = static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD");
-
         let b64_encoded_swap_ix = base64::decode("AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAoaudEwYcD83iSmOdiCYgl0FbE1EY/HTjC9O5vVR1aEHFWqc2Opgg73NeMj+N8A8YBI7KBlgAadkiYTWIQY7+9V8RhD6EtkoqBLhz59tziCckQWnJgl6UD5U8gAbmrlZLYAS5TMIJJnkcTF2Y9tnZJBMYjEdZLTelaWUxXjYxc1LQBy6joJxxNxIhqReCIF6ipi6l8dFod/NVBGlOa9DSJu5ISU5qD0vvrQhq+nyqyPEfzUf6sPd2hWARpSfIxTXxCGUV3Qo2oarR8RfanRO45fsiz96o0HIJ1mCfSLByJGBWQLj3UTm7d3XtPJYOBovoo6CwRU3hvpqEJYQE/IzLTCZ1waD1HOYC2xb6ZMp5eamugBnFs8axvo2gd01mOANYU53dHPHkhuGADDuqPZzbztsigJaTDSQgZyxNrWOAy/zmxXYyJa5D0osAqQhhSw0/YyqDhnIGj0GwDx3EdYMq7gmzQ75dsN/tO3arD+4cQKCwImHdTmOLddU/PySdwwBfo74xNweqSUKpWIXr/IcQHRrcRUO2enkrQ5Z80qSH/OUJKWKpuQ7lVrgHG91hWFUjOg8vE3WvyY/WShXVHKFExQ0POdIYrSqXHH5oP8cJLTXQbhX15dEO6iKalbaYnCU2fyQ9T66GpX3xFpsi1C4nTOMgvpYSQbxTsZEDouboxsAZm7zZUMob9Z6rKfT5aGxqXL6rHuJlQvFBgJ1Q9HioX3PftqSb72Tp8fjTN0jXGTukPmEi7RgGqM+MLi6vWxymkVBHnVH6nNSvb3qwqwbkgtxkwyjapZJyq+L06YgldeDnh+VHcaV6bxTKnkAtVK7kX3N4rKNlx7Fpp+yD9RgrKY8Abd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpGu2oNYDga4vix7P151kKaci+vDfG0APaJSmfnKJlpZ8nqtoym+YRqdZn6qX1bDrJAVznq35qhT3m2r7+nOVT4g4DaF+OkJBT5FgSHGb1p2rtx3BqoRyC+KqVKo8reHmpK9feXDkiJL2QzliBZ93nohLYkTD7z3ZjZmE+kHJx8sMGvwf3Oo0dtK8U/tuext6Xa3u+NU+95O6RRSyGRvtAdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARkeABAREgECExQVFgMEBQYCBwgXFAMJCgsCDA0ODxgBLnTPAMT8ePMSIgAAAAMBEQkCCw0LAEBCDwAAAAAAAAAAAAAAAAAIHZsMAAAAAAA=").unwrap();
         let mut orig_txn: Transaction = bincode::deserialize(&b64_encoded_swap_ix[..]).unwrap();
         let sanitized_msg = SanitizedMessage::Legacy(orig_txn.message().clone());

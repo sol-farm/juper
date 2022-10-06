@@ -9,8 +9,7 @@ use anchor_lang::{
     prelude::AccountMeta, solana_program::instruction::InstructionError, ToAccountMetas,
 };
 use anyhow::{anyhow, Result};
-use juper_swap_cpi::{JupiterIx, SwapInputs};
-use once_cell::sync::Lazy;
+
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_sdk::instruction::Instruction;
@@ -61,7 +60,7 @@ pub fn new_anyix_swap_ix_with_quote(
         cleanup,
     } = swap_config;
     let mut jup_any_ix = JupiterAnyIxSwap::default();
-    if let Some(_) = setup {
+    if setup.is_some() {
         log::warn!("transaction setup not yet supported");
     }
     jup_any_ix.swap = match process_transaction(
@@ -80,10 +79,10 @@ pub fn new_anyix_swap_ix_with_quote(
             return Err(anyhow!("{}", error_msg));
         }
     };
-    if let Some(_) = cleanup {
+    if cleanup.is_some() {
         log::warn!("transaction cleanup not yet supported");
     }
-    return Ok(jup_any_ix);
+    Ok(jup_any_ix)
 }
 
 /// creates, and sends an AnyIx jupiter swap using the given quote
