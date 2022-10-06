@@ -17,7 +17,8 @@ pub static DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
         "orca (whirlpools)".to_string(),
         "orca".to_string(),
         "raydium".to_string(),
-        "saner".to_string(),
+        "raydiumv2".to_string(),
+        "saber".to_string(),
     ]
 });
 
@@ -105,6 +106,7 @@ pub fn replace_by_account_pubkey(
 mod test {
     use super::*;
     use crate::anyix::test::solana_program::message::SanitizedMessage;
+    use crate::slippage::Slippage;
     use anchor_lang::solana_program;
     use simplelog::*;
     use solana_sdk::instruction::InstructionError;
@@ -284,6 +286,7 @@ mod test {
             2,
             None,
             &replacements,
+            Slippage::TwentyBip,
         );
 
         super::swap::new_anyix_swap(
@@ -300,6 +303,7 @@ mod test {
             2,
             None,
             &Default::default(),
+            Slippage::TwentyBip,
         );
         std::thread::sleep(std::time::Duration::from_secs(1));
         super::swap::new_anyix_swap(
@@ -316,6 +320,7 @@ mod test {
             2,
             Some(DEFAULT_MARKET_LIST.to_vec()),
             &Default::default(),
+            Slippage::TwentyBip,
         );
         std::thread::sleep(std::time::Duration::from_secs(1));
         super::swap::new_anyix_swap(
@@ -332,6 +337,7 @@ mod test {
             2,
             None,
             &Default::default(),
+            Slippage::TwentyBip,
         );
     }
 }

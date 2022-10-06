@@ -12,7 +12,7 @@ use anyhow::{anyhow, Result};
 
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcSendTransactionConfig;
-use solana_sdk::instruction::Instruction;
+use solana_sdk::{instruction::Instruction, signature::Signature};
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{message::SanitizedMessage, signer::Signer};
 
@@ -96,7 +96,7 @@ pub fn new_anyix_swap_with_quote(
     vault_pda: Pubkey,
     skip_preflight: bool,
     replacements: &HashMap<Pubkey, Pubkey>,
-) -> Result<()> {
+) -> Result<Signature> {
     let jup_any_ix = new_anyix_swap_ix_with_quote(
         swap_route,
         rpc,
@@ -134,7 +134,7 @@ pub fn new_anyix_swap_with_quote(
                 ..Default::default()
             },
         ) {
-            Ok(sig) => log::info!("sent jupiter swap ix {}", sig),
+            Ok(sig) => Ok(sig),
             Err(err) => {
                 let error_msg = format!("failed to send jupiter swap ix {:#?}", err);
                 log::error!("{}", error_msg);
@@ -143,7 +143,7 @@ pub fn new_anyix_swap_with_quote(
         }
     } else {
         match rpc.send_and_confirm_transaction(&tx) {
-            Ok(sig) => log::info!("sent jupiter swap ix {}", sig),
+            Ok(sig) => return Ok(sig),
             Err(err) => {
                 let error_msg = format!("failed to send jupiter swap ix {:#?}", err);
                 log::error!("{}", error_msg);
@@ -151,7 +151,6 @@ pub fn new_anyix_swap_with_quote(
             }
         }
     }
-    Ok(())
 }
 
 /// given an input and output mint, find up to `max_tries` routes
@@ -170,7 +169,8 @@ pub fn new_anyix_swap(
     max_tries: usize,
     allowed_market_names: Option<Vec<String>>,
     replacements: &HashMap<Pubkey, Pubkey>,
-) -> Result<()> {
+    slippage: Slippage,
+) -> Result<Signature> {
     let market_list: Vec<String> = if let Some(list) = allowed_market_names {
         list
     } else {
@@ -184,7 +184,7 @@ pub fn new_anyix_swap(
     .collect();
     let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
     let routes = quoter
-        .lookup_routes2(input_amount, false, Slippage::FifteenBip, FeeBps::Zero)?
+        .lookup_routes2(input_amount, false, slippage, FeeBps::Zero)?
         .iter_mut()
         .filter_map(|quote| {
             for market_info in (*quote).market_infos.iter_mut() {
@@ -203,7 +203,7 @@ pub fn new_anyix_swap(
         return Err(anyhow!("failed to find any routes"));
     }
     for route in routes.iter().take(max_tries) {
-        let swap_fn = |swap_route: Quote| -> Result<()> {
+        let swap_fn = |swap_route: Quote| -> Result<Signature> {
             new_anyix_swap_with_quote(
                 swap_route,
                 rpc,
@@ -216,12 +216,11 @@ pub fn new_anyix_swap(
                 replacements,
             )
         };
-        if swap_fn(route.clone()).is_ok() {
-            break;
+        if let Ok(sig) = swap_fn(route.clone()) {
+            return Ok(sig);
         }
     }
-
-    Ok(())
+    Err(anyhow!("failed to process jupiter swap"))
 }
 
 /// processes a transaction as returned from the jupiter swap api, into a format suitable for
