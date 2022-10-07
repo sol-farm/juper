@@ -345,34 +345,29 @@ pub fn process_transaction(
                         }
                     };
                 // for whirlpool swaps we need to manually specify the direction of the swap
-                match jup_ix {
-                    JupiterIx::Whirlpool => {
-                        let token_vault_a = ix.accounts[5].pubkey;
-                        match rpc.get_account_data(&token_vault_a) {
-                            Ok(data) => {
-                                match spl_token::state::Account::unpack_unchecked(&data[..]) {
-                                    Ok(token_vault_a_account) => {
-                                        if token_vault_a_account.mint.eq(&input_mint) {
-                                            log::debug!("whirlpool swap, setting side to 0 (ask)");
-                                            swap_input.side = 0;
-                                        } else if token_vault_a_account.mint.eq(&output_mint) {
-                                            log::debug!("whirlpool swap, setting side to 1 (bid)");
-                                            swap_input.side = 1;
-                                        }
-                                    }
-                                    Err(err) => {
-                                        log::error!("failed to process jupiter ix {:#?}", err);
-                                        return None;
-                                    }
+                if jup_ix == JupiterIx::Whirlpool {
+                    let token_vault_a = ix.accounts[5].pubkey;
+                    match rpc.get_account_data(&token_vault_a) {
+                        Ok(data) => match spl_token::state::Account::unpack_unchecked(&data[..]) {
+                            Ok(token_vault_a_account) => {
+                                if token_vault_a_account.mint.eq(&input_mint) {
+                                    log::debug!("whirlpool swap, setting side to 0 (ask)");
+                                    swap_input.side = 0;
+                                } else if token_vault_a_account.mint.eq(&output_mint) {
+                                    log::debug!("whirlpool swap, setting side to 1 (bid)");
+                                    swap_input.side = 1;
                                 }
                             }
                             Err(err) => {
                                 log::error!("failed to process jupiter ix {:#?}", err);
                                 return None;
                             }
+                        },
+                        Err(err) => {
+                            log::error!("failed to process jupiter ix {:#?}", err);
+                            return None;
                         }
                     }
-                    _ => (),
                 }
                 if let Ok(args) = super::new_jupiter_swap_ix_data(ix.clone(), jup_ix, swap_input) {
                     Some(args)
