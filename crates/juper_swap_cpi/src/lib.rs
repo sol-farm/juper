@@ -100,13 +100,18 @@ impl SwapInputs {
     }
     pub fn unpack(&mut self, data: &[u8]) -> Self {
         let data_len = data.len();
+
+        #[cfg(test)]
+        println!("data len {}", data_len);
+
         if data_len == 17 {
             let (input_amount, rest) = data.split_at(8);
-            let (min_output, rest) = rest.split_at(16);
+            let (min_output, rest) = rest.split_at(8);
             self.input_amount = Some(u64::try_from_slice(input_amount).unwrap());
             self.min_output = u64::try_from_slice(min_output).unwrap();
             self.side = rest[0];
         } else if data_len == 16 {
+            // we can probably remove this case
             let (input_amount, min_output) = data.split_at(8);
             self.input_amount = Some(u64::try_from_slice(input_amount).unwrap());
             self.min_output = u64::try_from_slice(min_output).unwrap();
@@ -114,16 +119,18 @@ impl SwapInputs {
             self.min_output = u64::try_from_slice(&data[0..8]).unwrap();
             self.side = data[8];
         } else if data_len == 8 {
+            // we can probably remove this case
             self.min_output = u64::try_from_slice(data).unwrap();
         }
         *self
     }
     pub fn pack(self) -> Vec<u8> {
-        let mut buffer = Vec::with_capacity(16);
+        let mut buffer = Vec::with_capacity(17);
         if let Some(input_amount) = self.input_amount {
             buffer.extend_from_slice(&input_amount.to_le_bytes()[..]);
         }
         buffer.extend_from_slice(&self.min_output.to_le_bytes()[..]);
+        buffer.push(self.side);
         buffer
     }
 }
@@ -818,7 +825,7 @@ impl JupiterIx {
 mod test {
     use super::*;
     #[test]
-    fn test_swap_inputs_empty() {
+    fn test_swap_inputs() {
         let input1 = vec![];
         let input2 = SwapInputs {
             input_amount: None,
@@ -832,10 +839,26 @@ mod test {
             side: 0,
         }
         .pack();
+        let input4 = SwapInputs {
+            input_amount: Some(690_420),
+            min_output: 69_69,
+            side: 1,
+        }
+        .pack();
+        let input5 = SwapInputs {
+            input_amount: None,
+            min_output: 69_69,
+            side: 1,
+        }
+        .pack();
+
 
         let got_input1 = SwapInputs::new().unpack(&input1[..]);
         let got_input2 = SwapInputs::new().unpack(&input2[..]);
         let got_input3 = SwapInputs::new().unpack(&input3[..]);
+        let got_input4 = SwapInputs::new().unpack(&input4[..]);
+        let got_input5 = SwapInputs::new().unpack(&input5[..]);
+
 
         assert!(got_input1.input_amount.is_none());
         assert!(got_input1.min_output == 0);
@@ -845,5 +868,12 @@ mod test {
 
         assert!(got_input3.input_amount.unwrap() == 690_420);
         assert!(got_input3.min_output == 69_69);
+
+        assert!(got_input4.input_amount.unwrap() == 690_420);
+        assert!(got_input4.min_output == 69_69);
+
+        assert!(got_input5.input_amount.is_none());
+        assert!(got_input5.min_output == 69_69);
+        assert!(got_input5.side == 1);
     }
 }
