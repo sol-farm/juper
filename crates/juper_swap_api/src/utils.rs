@@ -6,8 +6,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-/// decompiles a transaction into it's individual instructions, sorted
-/// by execution order
+/// decompiles a transaction into it's individual instructions, sorted by execution order
 pub fn decompile_transaction_instructions(mut tx: Transaction) -> Result<Vec<Instruction>> {
     let sanitized_msg = SanitizedMessage::Legacy(tx.message.clone());
     let mut instructions = Vec::with_capacity(tx.message.instructions.len());

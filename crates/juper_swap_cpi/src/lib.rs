@@ -1,3 +1,5 @@
+/// a lightweight crate that can be used both for Jupiter CPI, as well as for
+/// implementing, and using proxied jupiter swaps via AnyIx
 pub mod accounts;
 pub mod instructions;
 
@@ -17,7 +19,12 @@ use anchor_lang::{prelude::*, InstructionData};
 use solana_program::{instruction::Instruction, program_pack::Pack};
 use std::collections::BTreeMap;
 
-//#[inline(always)]
+/// The reference implementation of the AnyIx instruction parser for use with
+/// the juper_swap_cpi crate. It performs basic access controls, ensuring
+/// the provided jupiter progrma account is the V3 aggregator, and that all
+/// input and output token accounts are owned by the `wanted_toke_owner`.
+///
+/// If you need any additional validations, you should implement your own function
 pub fn process_instructions<'info>(
     // the account address that should own the token accounts which will receive
     // the outputs and inputs of the swaps
@@ -56,9 +63,10 @@ pub fn process_instructions<'info>(
     Ok(())
 }
 
-/// given instruction data, process it to determine what if any
-/// jupiter instructions are being invoked, and the input arguments
-pub fn process_jupiter_instruction(input: &[u8]) -> Result<(JupiterIx, SwapInputs)> {
+/// Decodes the instruction data for a single instruction included within the transactions
+/// returned by jupiter's swap api. The decoded instruction data is then parsed into
+/// the market the swap is being routed on, along with the swap input values
+pub fn decode_jupiter_instruction(input: &[u8]) -> Result<(JupiterIx, SwapInputs)> {
     if input.len() > 8 {
         let (ix_data, inputs) = input.split_at(8);
         let jupiter_ix: JupiterIx = TryFrom::try_from(ix_data)?;
@@ -76,6 +84,7 @@ pub fn process_jupiter_instruction(input: &[u8]) -> Result<(JupiterIx, SwapInput
     }
 }
 
+/// Wraps the input values for a given swap
 #[derive(Clone, Copy, Default, Debug)]
 pub struct SwapInputs {
     pub input_amount: Option<u64>,
@@ -98,6 +107,7 @@ impl SwapInputs {
             Side::Bid
         }
     }
+    /// Unpacks the given `data` buffer into self
     pub fn unpack(&mut self, data: &[u8]) -> Self {
         let data_len = data.len();
 
@@ -124,6 +134,7 @@ impl SwapInputs {
         }
         *self
     }
+    /// serializes the swap inputs
     pub fn pack(self) -> Vec<u8> {
         let mut buffer = Vec::with_capacity(17);
         if let Some(input_amount) = self.input_amount {
@@ -194,6 +205,10 @@ impl From<JupiterIx> for u8 {
 /// given what is presumed to be anchor program instruction data
 /// which is equal to or greater than  8 bytes, determine which
 /// of the JupiterIx variants this instruction data is for.
+///
+/// while this can technically match any anchor program instruction data
+/// it's meant for use with jupiter instructions, usage with non jupiter instructions
+/// is unsupported
 impl TryFrom<&[u8]> for JupiterIx {
     type Error = ProgramError;
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
@@ -239,6 +254,8 @@ impl TryFrom<&[u8]> for JupiterIx {
 }
 
 impl JupiterIx {
+    /// given the buffer `data`, deserialize into swap inputs
+    /// for a protocol as determined by the variant of self
     pub fn get_swap_inputs(&self, data: &[u8]) -> Result<SwapInputs> {
         match self {
             JupiterIx::TokenSwap => match instructions::token_swap::TokenSwap::try_from_slice(data)
@@ -382,6 +399,12 @@ impl JupiterIx {
             JupiterIx::SetTokenLedger => Ok(Default::default()),
         }
     }
+    /// Executes a single swap via the jupiter aggregator program
+    /// validating that the input/output token accounts are owned
+    /// by `signer`.
+    ///
+    /// A `None` value for `input` is overriden with the token amount
+    /// value of the source token account being used in the swap
     pub fn execute<'info>(
         &self,
         mut accounts: &[AccountInfo<'info>],
@@ -784,17 +807,18 @@ impl JupiterIx {
             anchor_lang::solana_program::program::invoke(&ix, &account_infos[..]).unwrap();
         }
     }
-    ///  given the swap_input, encode the JupiterIx object into AnyIX instruction data
+    /// serializes the jupiter swap instruction, and swap input data
     pub fn encode_swap_ix_data(&self, swap_inputs: SwapInputs) -> Vec<u8> {
         let mut swap_information = swap_inputs.pack();
         swap_information.insert(0, (*self).into());
         swap_information
     }
+    /// serializes the jupiter instruction used to set the token ledger value
     pub fn encode_token_ledger_ix_data(&self) -> Vec<u8> {
         vec![(*self).into()]
     }
-    /// encodes given JupiterIx into swap instruction data suitable for parsing
-    /// by any
+    /// create an insruuction which can be used to perform a proxied jupiter
+    /// swap via any program implemented the compatible AnyIx instruction parser.
     pub fn encode_swap_ix(
         &self,
         swap_inputs: SwapInputs,
@@ -807,8 +831,8 @@ impl JupiterIx {
             data: self.encode_swap_ix_data(swap_inputs),
         }
     }
-    /// encodes the goven JupiterIx into token ledger instruction data
-    /// suitable for parsing by AnyIx
+    /// create an insruuction which can be used to perform a proxied jupiter
+    /// set token ledger ix via any program implemented the compatible AnyIx instruction parser.
     pub fn encode_token_ledger_ix(
         &self,
         vaults_program: Pubkey,
@@ -852,13 +876,11 @@ mod test {
         }
         .pack();
 
-
         let got_input1 = SwapInputs::new().unpack(&input1[..]);
         let got_input2 = SwapInputs::new().unpack(&input2[..]);
         let got_input3 = SwapInputs::new().unpack(&input3[..]);
         let got_input4 = SwapInputs::new().unpack(&input4[..]);
         let got_input5 = SwapInputs::new().unpack(&input5[..]);
-
 
         assert!(got_input1.input_amount.is_none());
         assert!(got_input1.min_output == 0);

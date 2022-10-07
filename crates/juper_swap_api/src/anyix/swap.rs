@@ -13,9 +13,9 @@ use juper_swap_cpi::JupiterIx;
 use regex::RegexSet;
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcSendTransactionConfig;
-use solana_sdk::{signer::Signer, program_pack::Pack};
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{instruction::Instruction, signature::Signature};
+use solana_sdk::{program_pack::Pack, signer::Signer};
 
 #[cfg(test)]
 use solana_client::rpc_client::serialize_and_encode;
@@ -24,6 +24,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use super::{replace_accounts, replace_by_account_pubkey, MARKET_BLACKLIST};
 
+/// Wraps the setup, swap, and cleanup transactions decoded from
+/// jupiters swap api.
+///
+/// This is slightly modified from the original response, as it does not contain transactions
+/// rather the individual instruction(s) to be used, as execution of these instructions
+/// is being delegated to AnyIx
 #[derive(Clone, Default)]
 pub struct JupiterAnyIxSwap {
     /// vector of instructions to use for the setup process, currently unused
@@ -34,7 +40,10 @@ pub struct JupiterAnyIxSwap {
     pub cleanup: Option<Vec<Instruction>>,
 }
 
-/// returns the encoded Instruction
+/// given a specific trade route `swap_route`, request a transaction
+/// from jupiter's swap api, decode the included transactions into
+/// their individual instructions, and then encode the swap related
+/// instructions into the AnyIx instruction format
 pub fn new_anyix_swap_ix_with_quote(
     swap_route: Quote,
     rpc: &Arc<RpcClient>,
@@ -84,7 +93,7 @@ pub fn new_anyix_swap_ix_with_quote(
         management,
         replacements,
         input_mint,
-        output_mint
+        output_mint,
     ) {
         Ok(ix) => Some(ix),
         Err(err) => {
@@ -99,7 +108,23 @@ pub fn new_anyix_swap_ix_with_quote(
     Ok(jup_any_ix)
 }
 
-/// creates, and sends an AnyIx jupiter swap using the given quote
+/// given a specific trade route `swap_route`, parse and execute
+/// the trade via AnyIX
+///
+///  `anyix_program` will be the program implementing the `jupiter_swap` function
+/// that decodes AnyIx instruction data.
+///
+/// The `disallowed_market_list` regex set contains a list of markets
+/// that will cause any containing routes to be filtered out from the list
+/// of available routes. If set to `None` the default blacklist is used.
+///
+/// The `replacements` map is used to replace accounts returned by
+/// jupiters swap api. The keys of the map are the accounts to replace
+/// while the values are the accounts to replace them with
+///
+/// When `fail_on_setup` is true, if the transaction returned via
+/// jupiter's swap api requires setup, an error is returned, advancing
+/// the `max_tries` count by 1.
 pub fn new_anyix_swap_with_quote(
     swap_route: Quote,
     rpc: &Arc<RpcClient>,
@@ -125,7 +150,7 @@ pub fn new_anyix_swap_with_quote(
         replacements,
         fail_on_setup,
         input_mint,
-        output_mint
+        output_mint,
     )?;
     let jup_swap_ix = if let Some(swap_ix) = jup_any_ix.swap {
         swap_ix
@@ -173,8 +198,24 @@ pub fn new_anyix_swap_with_quote(
     }
 }
 
-/// given an input and output mint, find up to `max_tries` routes
-/// which will be executed sequentially until the first one succeeds
+/// Given a specific input and output mint, find up to `max_tries`
+/// routes that will be swapped through sequentially, stopping
+/// on the first success or once `max_tries`is reached.
+///
+/// `anyix_program` will be the program implementing the `jupiter_swap` function
+/// that decodes AnyIx instruction data.
+///
+/// The `disallowed_market_list` regex set contains a list of markets
+/// that will cause any containing routes to be filtered out from the list
+/// of available routes. If set to `None` the default blacklist is used.
+///
+/// The `replacements` map is used to replace accounts returned by
+/// jupiters swap api. The keys of the map are the accounts to replace
+/// while the values are the accounts to replace them with
+///
+/// When `fail_on_setup` is true, if the transaction returned via
+/// jupiter's swap api requires setup, an error is returned, advancing
+/// the `max_tries` count by 1.
 pub fn new_anyix_swap(
     rpc: &Arc<RpcClient>,
     payer: &dyn Signer,
@@ -204,7 +245,7 @@ pub fn new_anyix_swap(
         .filter(|quote| {
             for market_info in quote.market_infos.iter() {
                 if market_blacklist.is_match(&market_info.label) {
-                    log::warn!("ignoring market {}", market_info.label);
+                    log::debug!("ignoring market {}", market_info.label);
                     return false;
                 } else {
                     continue;
@@ -232,10 +273,14 @@ pub fn new_anyix_swap(
                 replacements,
                 fail_on_setup,
                 input_mint,
-                output_mint
+                output_mint,
             )
         };
-        log::debug!("processing route {}, markets {}", idx, route.formatted_market_infos());
+        log::debug!(
+            "processing route {}, markets {}",
+            idx,
+            route.formatted_market_infos()
+        );
         match swap_fn(route.clone()) {
             Ok(sig) => return Ok(sig),
             Err(err) => {
@@ -246,8 +291,14 @@ pub fn new_anyix_swap(
     Err(anyhow!("failed to process jupiter swap"))
 }
 
-/// processes a transaction as returned from the jupiter swap api, into a format suitable for
-/// execution with AnyIx
+/// Processes a decoded transaction returned from jupiter's swap api. This
+/// should only be used with the swap transaction however it can be used
+/// with the setup and cleanup transactions but that is not officially supported.
+///
+/// The transaction is decompiled into it's individual instructions, which are
+/// then encoded into the AnyIX format, and a single instruction is returned
+/// that can be used to execute the swap transaction proxied through any program
+/// that implements the `jupiter_swap` AnyIx instruction.
 pub fn process_transaction(
     rpc: &Arc<RpcClient>,
     payer: &dyn Signer,
@@ -285,8 +336,8 @@ pub fn process_transaction(
                         account.clone()
                     })
                     .collect();
-                let (jup_ix, mut  swap_input) =
-                    match juper_swap_cpi::process_jupiter_instruction(&ix.data[..]) {
+                let (jup_ix, mut swap_input) =
+                    match juper_swap_cpi::decode_jupiter_instruction(&ix.data[..]) {
                         Ok(ix) => ix,
                         Err(err) => {
                             log::error!("failed to process jupiter ix {:#?}", err);
@@ -302,13 +353,13 @@ pub fn process_transaction(
                                 match spl_token::state::Account::unpack_unchecked(&data[..]) {
                                     Ok(token_vault_a_account) => {
                                         if token_vault_a_account.mint.eq(&input_mint) {
-                                            log::warn!("whirlpool swap, setting side to 0 (ask)");
+                                            log::debug!("whirlpool swap, setting side to 0 (ask)");
                                             swap_input.side = 0;
                                         } else if token_vault_a_account.mint.eq(&output_mint) {
-                                            log::warn!("whirlpool swap, setting side to 1 (bid)");
+                                            log::debug!("whirlpool swap, setting side to 1 (bid)");
                                             swap_input.side = 1;
                                         }
-                                    } 
+                                    }
                                     Err(err) => {
                                         log::error!("failed to process jupiter ix {:#?}", err);
                                         return None;

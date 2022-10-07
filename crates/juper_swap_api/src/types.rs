@@ -112,9 +112,14 @@ pub struct SwapConfig {
     pub token_ledger: Option<Pubkey>,
 }
 
-
 impl Quote {
     pub fn formatted_market_infos(&self) -> String {
-        format!("market_infos={:?}", self.market_infos.iter().map(|m_info| &m_info.label).collect::<Vec<_>>())
+        format!(
+            "market_infos={:?}",
+            self.market_infos
+                .iter()
+                .map(|m_info| &m_info.label)
+                .collect::<Vec<_>>()
+        )
     }
 }

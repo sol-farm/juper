@@ -15,11 +15,9 @@ use solana_sdk::instruction::Instruction;
 use std::{collections::HashMap, sync::Arc};
 
 lazy_static! {
-    /// a set of markets to blacklist from anyix swaps
+    /// default list of markets that we will blacklist from being swapped against
     pub static ref MARKET_BLACKLIST: RegexSet = RegexSet::new(&[
-                    // sets case insensitive matching
-                    //r"(?i)lifinity",
-                    //r"(?i)mercurial",
+                    // (?i) sets case insensitive matching
                     r"(?i)goosefx",
     ]).unwrap();
 }
@@ -46,8 +44,7 @@ pub fn new_jupiter_swap_ix(
     }
 }
 
-/// given an instruction from the jupiter swap api, encode the instruction
-/// into the AnyIx format accepted by our vaults program
+/// given an instruction from the jupiter swap api, encode the instruction data and accounts
 pub fn new_jupiter_swap_ix_data(
     swap_api_ix: Instruction,
     jup_ix: JupiterIx,
@@ -144,7 +141,7 @@ mod test {
             ColorChoice::Auto,
         );
         let rpc = Arc::new(RpcClient::new("https://ssc-dao.genesysgo.net".to_string()));
-     
+
         let usdh_mint = static_pubkey!("USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX");
         let msol_mint = static_pubkey!("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
 
@@ -156,11 +153,8 @@ mod test {
         let replacements = HashMap::default();
         // list markets to remove so we can increase the odds of the route aggregator
         // returning a whirlpool swap
-        let regex_set: RegexSet = RegexSet::new(&[
-            r"(?i)raydium",
-            r"(?i)serum",
-            r"(?i)lifinity",
-        ]).unwrap();
+        let regex_set: RegexSet =
+            RegexSet::new(&[r"(?i)raydium", r"(?i)serum", r"(?i)lifinity"]).unwrap();
         super::swap::new_anyix_swap(
             &rpc,
             &payer,
@@ -178,7 +172,6 @@ mod test {
             Slippage::TwentyBip,
             false,
         );
-
     }
     #[test]
     #[allow(unused_must_use)]
