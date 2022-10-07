@@ -6,17 +6,15 @@ use crate::{
 };
 use anchor_lang::solana_program::pubkey::Pubkey;
 use anchor_lang::InstructionData;
-use anchor_lang::{
-    prelude::AccountMeta, solana_program::instruction::InstructionError, ToAccountMetas,
-};
+use anchor_lang::ToAccountMetas;
 use anyhow::{anyhow, Result};
 
 use regex::RegexSet;
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcSendTransactionConfig;
+use solana_sdk::signer::Signer;
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{instruction::Instruction, signature::Signature};
-use solana_sdk::{message::SanitizedMessage, signer::Signer};
 
 #[cfg(test)]
 use solana_client::rpc_client::serialize_and_encode;
@@ -151,16 +149,16 @@ pub fn new_anyix_swap_with_quote(
             Err(err) => {
                 let error_msg = format!("failed to send jupiter swap ix {:#?}", err);
                 log::debug!("{}", error_msg);
-                return Err(anyhow!("{}", error_msg));
+                Err(anyhow!("{}", error_msg))
             }
         }
     } else {
         match rpc.send_and_confirm_transaction(&tx) {
-            Ok(sig) => return Ok(sig),
+            Ok(sig) => Ok(sig),
             Err(err) => {
                 let error_msg = format!("failed to send jupiter swap ix {:#?}", err);
                 log::debug!("{}", error_msg);
-                return Err(anyhow!("{}", error_msg));
+                Err(anyhow!("{}", error_msg))
             }
         }
     }

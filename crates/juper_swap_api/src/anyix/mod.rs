@@ -6,8 +6,8 @@ use anchor_lang::prelude::AccountMeta;
 use anyhow::Result;
 use juper_swap_cpi::{JupiterIx, SwapInputs};
 use lazy_static::lazy_static;
-use once_cell::sync::Lazy;
-use regex::{Regex, RegexSet};
+
+use regex::RegexSet;
 use solana_client::rpc_client::RpcClient;
 
 use solana_sdk::instruction::Instruction;

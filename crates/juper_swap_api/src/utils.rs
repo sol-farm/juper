@@ -1,5 +1,5 @@
 use anchor_lang::prelude::AccountMeta;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use solana_sdk::message::SanitizedMessage;
 use solana_sdk::{
     instruction::{Instruction, InstructionError},
