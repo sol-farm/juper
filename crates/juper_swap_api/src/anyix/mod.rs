@@ -18,7 +18,7 @@ lazy_static! {
     /// a set of markets to blacklist from anyix swaps
     pub static ref MARKET_BLACKLIST: RegexSet = RegexSet::new(&[
                     // sets case insensitive matching
-                    r"(?i)lifinity",
+                    //r"(?i)lifinity",
                     r"(?i)mercurial",
     ]).unwrap();
 }
