@@ -134,7 +134,7 @@ pub fn new_anyix_swap_with_quote(
     );
 
     tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
-    log::info!("sending jupiter swap ix");
+    log::debug!("sending jupiter swap ix");
     if skip_preflight {
         match rpc.send_transaction_with_config(
             &tx,
