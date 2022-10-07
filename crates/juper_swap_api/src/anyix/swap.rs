@@ -2,6 +2,7 @@
 use crate::{
     slippage::{FeeBps, Slippage},
     types::{Quote, SwapConfig},
+    utils::decompile_transaction_instructions,
 };
 use anchor_lang::solana_program::pubkey::Pubkey;
 use anchor_lang::InstructionData;
@@ -66,10 +67,13 @@ pub fn new_anyix_swap_ix_with_quote(
     } = swap_config;
     let mut jup_any_ix = JupiterAnyIxSwap::default();
     if setup.is_some() && !fail_on_setup {
-        log::warn!("transaction setup not yet supported");
+        if let Some(setup) = setup {
+            jup_any_ix.setup = Some(decompile_transaction_instructions(setup)?)
+        }
     } else if setup.is_some() && fail_on_setup {
         return Err(anyhow!("abort on transaction setup enabled"));
     }
+
     jup_any_ix.swap = match process_transaction(
         rpc,
         payer,
@@ -238,41 +242,7 @@ pub fn process_transaction(
     management: Pubkey,
     replacements: &HashMap<Pubkey, Pubkey>,
 ) -> Result<Instruction> {
-    // create the legacy and sanitized messages used for processesing
-    let sanitized_msg = SanitizedMessage::Legacy(tx.message.clone());
-    let mut instructions = Vec::with_capacity(tx.message.instructions.len());
-
-    instructions.append(
-        &mut tx
-            .message
-            .instructions
-            .iter_mut()
-            .map(|compiled_ix| {
-                Instruction::new_with_bytes(
-                    *sanitized_msg
-                        .get_account_key(compiled_ix.program_id_index.into())
-                        .ok_or(InstructionError::MissingAccount)
-                        .unwrap(),
-                    &compiled_ix.data,
-                    compiled_ix
-                        .accounts
-                        .iter()
-                        .map(|account_index| {
-                            let account_index = *account_index as usize;
-                            Ok(AccountMeta {
-                                is_signer: sanitized_msg.is_signer(account_index),
-                                is_writable: sanitized_msg.is_writable(account_index),
-                                pubkey: *sanitized_msg
-                                    .get_account_key(account_index)
-                                    .ok_or(InstructionError::MissingAccount)?,
-                            })
-                        })
-                        .collect::<Result<Vec<AccountMeta>, InstructionError>>()
-                        .unwrap(),
-                )
-            })
-            .collect::<Vec<_>>(),
-    );
+    let mut instructions = decompile_transaction_instructions(tx.clone())?;
     // ensure all instructions invoke a program_id that is whitelisted
     for ix in instructions.iter() {
         // prevent a rogue api from returning programs that are not the ata or jupiter progarm

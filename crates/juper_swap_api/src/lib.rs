@@ -11,6 +11,7 @@ pub mod quoter;
 pub mod route_cache;
 pub mod slippage;
 pub mod types;
+pub mod utils;
 
 use types::{Price, Quote, Response, RouteMap, Swap, SwapConfig, SwapRequest, SwapResponse};
 
