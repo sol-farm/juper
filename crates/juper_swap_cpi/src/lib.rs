@@ -394,18 +394,18 @@ impl JupiterIx {
                     &mut BTreeMap::default(),
                 )
                 .unwrap();
-                let ix_data = instructions::token_swap::TokenSwap {
-                    _in_amount: input,
-                    _minimum_out_amount: min_output,
-                    _platform_fee_bps: 0,
-                }
-                .data();
                 let source_token_account =
                     spl_token::state::Account::unpack(&mer_swap.source.data.borrow()).unwrap();
                 let dest_token_account =
                     spl_token::state::Account::unpack(&mer_swap.destination.data.borrow()).unwrap();
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
+                let ix_data = instructions::token_swap::TokenSwap {
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
+                    _minimum_out_amount: min_output,
+                    _platform_fee_bps: 0,
+                }
+                .data();
                 let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: mer_swap.to_account_metas(None),
@@ -433,7 +433,7 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::aldrin_v2::AldrinV2Swap {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
                     _side: side,
@@ -462,7 +462,7 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::cropper::CropperTokenSwap {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
                 }
@@ -492,7 +492,7 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::cykura::CykuraSwap {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
                 }
@@ -521,7 +521,7 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::lifinity::LifinityTokenSwap {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
                 }
@@ -552,7 +552,7 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::mercurial::MercurialExchange {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
                 }
@@ -584,7 +584,7 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::raydium::RaydiumSwap {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
                 }
@@ -605,12 +605,6 @@ impl JupiterIx {
                     &mut BTreeMap::default(),
                 )
                 .unwrap();
-                let ix_data = instructions::raydium_v2::RaydiumSwapV2 {
-                    _in_amount: input,
-                    _minimum_out_amount: min_output,
-                    _platform_fee_bps: 0,
-                }
-                .data();
                 let source_token_account = spl_token::state::Account::unpack(
                     &ray_swap.user_source_token_account.data.borrow(),
                 )
@@ -621,6 +615,12 @@ impl JupiterIx {
                 .unwrap();
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
+                let ix_data = instructions::raydium_v2::RaydiumSwapV2 {
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
+                    _minimum_out_amount: min_output,
+                    _platform_fee_bps: 0,
+                }
+                .data();
                 let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: ray_swap.to_account_metas(None),
@@ -648,7 +648,7 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::whirlpool::WhirlpoolSwap {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _a_to_b: side.a_to_b(),
                     _platform_fee_bps: 0,
@@ -675,15 +675,23 @@ impl JupiterIx {
                 //
                 // therefore dont bother validating the order payer token account, but validate the wallet accounts instead
 
-                let source_token_account =
-                    spl_token::state::Account::unpack(&serum_swap.coin_wallet.data.borrow())
-                        .unwrap();
-                let dest_token_account =
-                    spl_token::state::Account::unpack(&serum_swap.pc_wallet.data.borrow()).unwrap();
+                {
+                    let source_token_account =
+                        spl_token::state::Account::unpack(&serum_swap.coin_wallet.data.borrow())
+                            .unwrap();
+                    let dest_token_account =
+                        spl_token::state::Account::unpack(&serum_swap.pc_wallet.data.borrow())
+                            .unwrap();
+                    assert!(source_token_account.owner.eq(&signer));
+                    assert!(dest_token_account.owner.eq(&signer));
+                }
+                let source_token_account = spl_token::state::Account::unpack(
+                    &serum_swap.order_payer_token_account.data.borrow(),
+                )
+                .unwrap();
                 assert!(source_token_account.owner.eq(&signer));
-                assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::serum::SerumSwap {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _side: side,
                     _platform_fee_bps: 0,
@@ -736,7 +744,7 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::saber::SaberSwap {
-                    _in_amount: input,
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
                 }
