@@ -5,30 +5,23 @@ use anchor_lang::solana_program::pubkey::Pubkey;
 use anchor_lang::prelude::AccountMeta;
 use anyhow::Result;
 use juper_swap_cpi::{JupiterIx, SwapInputs};
+use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
+use regex::{Regex, RegexSet};
 use solana_client::rpc_client::RpcClient;
 
 use solana_sdk::instruction::Instruction;
 
 use std::{collections::HashMap, sync::Arc};
 
-/// todo move to regex
-pub static DEFAULT_MARKET_LIST: Lazy<Vec<String>> = Lazy::new(|| {
-    vec![
-        "orca (whirlpools)".to_string(),
-        "orca".to_string(),
-        "raydium".to_string(),
-        "raydiumv2".to_string(),
-        "saber".to_string(),
-        "orca (whirlpools) (95%) + raydium (5%)".to_string(),
-        "raydium (95%) + orca (5%)".to_string(),
-        "orca (whirlpools) (85%) + orca (15%)".to_string(),
-        "orca (95%) + raydium (5%)".to_string(),
-        "cykura".to_string()
-        //"mercurial".to_string(),
-        //"lifinity".to_string(),
-    ]
-});
+lazy_static! {
+    /// a set of markets to blacklist from anyix swaps
+    pub static ref MARKET_BLACKLIST: RegexSet = RegexSet::new(&[
+                    // sets case insensitive matching
+                    r"(?i)lifinity",
+                    r"(?i)mercurial",
+    ]).unwrap();
+}
 
 /// wraps the instruction data, and instruction accounts required by an AnyIx instruction
 pub struct AnyIxArgs {
@@ -326,7 +319,7 @@ mod test {
             1.0,
             false,
             2,
-            Some(DEFAULT_MARKET_LIST.to_vec()),
+            Some(MARKET_BLACKLIST.clone()),
             &Default::default(),
             Slippage::TwentyBip,
         );

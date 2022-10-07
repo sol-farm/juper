@@ -10,6 +10,7 @@ use anchor_lang::{
 };
 use anyhow::{anyhow, Result};
 
+use regex::RegexSet;
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_sdk::transaction::Transaction;
@@ -21,7 +22,7 @@ use solana_client::rpc_client::serialize_and_encode;
 
 use std::{collections::HashMap, sync::Arc};
 
-use super::{replace_accounts, replace_by_account_pubkey};
+use super::{replace_accounts, replace_by_account_pubkey, MARKET_BLACKLIST};
 
 #[derive(Clone, Default)]
 pub struct JupiterAnyIxSwap {
@@ -75,7 +76,7 @@ pub fn new_anyix_swap_ix_with_quote(
         Ok(ix) => Some(ix),
         Err(err) => {
             let error_msg = format!("tx process failed {:#?}", err);
-            log::error!("{}", error_msg);
+            log::debug!("{}", error_msg);
             return Err(anyhow!("{}", error_msg));
         }
     };
@@ -137,7 +138,7 @@ pub fn new_anyix_swap_with_quote(
             Ok(sig) => Ok(sig),
             Err(err) => {
                 let error_msg = format!("failed to send jupiter swap ix {:#?}", err);
-                log::error!("{}", error_msg);
+                log::debug!("{}", error_msg);
                 return Err(anyhow!("{}", error_msg));
             }
         }
@@ -146,7 +147,7 @@ pub fn new_anyix_swap_with_quote(
             Ok(sig) => return Ok(sig),
             Err(err) => {
                 let error_msg = format!("failed to send jupiter swap ix {:#?}", err);
-                log::error!("{}", error_msg);
+                log::debug!("{}", error_msg);
                 return Err(anyhow!("{}", error_msg));
             }
         }
@@ -167,34 +168,26 @@ pub fn new_anyix_swap(
     input_amount: f64,
     skip_preflight: bool,
     max_tries: usize,
-    allowed_market_names: Option<Vec<String>>,
+    disallowed_market_list: Option<RegexSet>,
     replacements: &HashMap<Pubkey, Pubkey>,
     slippage: Slippage,
 ) -> Result<Signature> {
-    let market_list: Vec<String> = if let Some(list) = allowed_market_names {
+    let market_blacklist: RegexSet = if let Some(list) = disallowed_market_list {
         list
     } else {
-        super::DEFAULT_MARKET_LIST.clone()
-    }
-    .iter_mut()
-    .map(|minfo| {
-        minfo.make_ascii_lowercase();
-        minfo.to_owned()
-    })
-    .collect();
+        MARKET_BLACKLIST.clone()
+    };
     let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
     let routes = quoter
         .lookup_routes2(input_amount, false, slippage, FeeBps::Zero)?
         .into_iter()
         .filter(|quote| {
             for market_info in quote.market_infos.iter() {
-                let mut label = market_info.label.clone();
-                label.make_ascii_lowercase();
-                if market_list.contains(&label) {
-                    continue;
-                } else {
-                    println!("ignoring market {}", market_info.label);
+                if market_blacklist.is_match(&market_info.label) {
+                    log::warn!("ignoring market {}", market_info.label);
                     return false;
+                } else {
+                    continue;
                 }
             }
             true

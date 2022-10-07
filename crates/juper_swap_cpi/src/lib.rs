@@ -38,17 +38,12 @@ pub fn process_instructions<'info>(
     } = any_ix;
     let mut offset = 0;
     for idx in 0..num_instructions {
-        msg!("processing ix {}", idx);
         let accounts = &remaining_accounts[offset as usize..];
-        //offset += accounts.len();
         offset += instruction_account_counts[idx as usize] as usize;
 
         // the first element of the data slice is going to be the JupiterIx variant
         let jupiter_ix: JupiterIx = From::from(instruction_datas[idx as usize][0]);
-        msg!("unpacking swap inputs");
         let swap_inputs = SwapInputs::new().unpack(&instruction_datas[idx as usize][1..]);
-        //assert!(jupiter_ix.validate(&accounts[..], wanted_token_owner));
-        msg!("executing");
         jupiter_ix.execute(
             accounts,
             seeds,
@@ -197,6 +192,7 @@ impl TryFrom<&[u8]> for JupiterIx {
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
         use instructions::sighashes::*;
         if value.len() < 8 {
+            msg!("instruction data to small {}", value.len());
             return Err(ProgramError::AccountDataTooSmall);
         }
         let ix_data = &value[0..8];
@@ -229,6 +225,7 @@ impl TryFrom<&[u8]> for JupiterIx {
         } else if ix_data.eq(&SET_TOKEN_LEDGER) {
             Ok(Self::SetTokenLedger)
         } else {
+            msg!("invalid jupiter ix {:#?}", value);
             Err(ProgramError::InvalidInstructionData)
         }
     }
@@ -389,6 +386,7 @@ impl JupiterIx {
     ) {
         let (mut ix, account_infos, skip_signer) = match self {
             Self::TokenSwap => {
+                msg!("processing token swap");
                 let mer_swap = accounts::TokenSwap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -416,6 +414,7 @@ impl JupiterIx {
                 (ix, mer_swap.to_account_infos(), false)
             }
             Self::AldrinV2Swap => {
+                msg!("processing aldrinv2 swap");
                 let mer_swap = accounts::AldrinV2Swap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -448,6 +447,7 @@ impl JupiterIx {
                 (ix, mer_swap.to_account_infos(), false)
             }
             Self::CropperTokenSwap => {
+                msg!("processing cropper swap");
                 let mer_swap = accounts::CropperTokenSwap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -475,6 +475,7 @@ impl JupiterIx {
                 (ix, mer_swap.to_account_infos(), false)
             }
             Self::CykuraTokenSwap => {
+                msg!("processing cykura swap");
                 let mer_swap = accounts::CykuraSwap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -504,6 +505,7 @@ impl JupiterIx {
                 (ix, mer_swap.to_account_infos(), false)
             }
             Self::LifinityTokenSwap => {
+                msg!("processing lifinity swap");
                 let mer_swap = accounts::LifinityTokenSwap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -532,6 +534,7 @@ impl JupiterIx {
                 (ix, mer_swap.to_account_infos(), false)
             }
             Self::MercurialExchange => {
+                msg!("processing mercurial swap");
                 let mer_swap = accounts::MercurialExchange::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -562,6 +565,7 @@ impl JupiterIx {
                 (ix, mer_swap.to_account_infos(), false)
             }
             Self::RaydiumSwap => {
+                msg!("processing raydium swap");
                 let ray_swap = accounts::RaydiumSwap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -593,6 +597,7 @@ impl JupiterIx {
                 (ix, ray_swap.to_account_infos(), false)
             }
             Self::RaydiumSwapV2 => {
+                msg!("processing raydiumv2 swap");
                 let ray_swap = accounts::RaydiumSwapV2::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -624,6 +629,7 @@ impl JupiterIx {
                 (ix, ray_swap.to_account_infos(), false)
             }
             Self::Whirlpool => {
+                msg!("processing whirlpool swap");
                 let whirlpool_swap = accounts::WhirlpoolSwap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -656,6 +662,7 @@ impl JupiterIx {
                 (ix, whirlpool_swap.to_account_infos(), false)
             }
             Self::Serum => {
+                msg!("processing serum swap");
                 let serum_swap = accounts::SerumSwap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -690,6 +697,7 @@ impl JupiterIx {
                 (ix, serum_swap.to_account_infos(), false)
             }
             Self::SetTokenLedger => {
+                msg!("processing set token ledger");
                 let token_ledger = accounts::SetTokenLedger::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
@@ -710,6 +718,7 @@ impl JupiterIx {
                 (ix, token_ledger.to_account_infos(), true)
             }
             Self::Saber => {
+                msg!("processing saber swap");
                 let saber_swap = accounts::SaberSwap::try_accounts(
                     &JUPITER_V3_AGG_ID,
                     &mut accounts,
