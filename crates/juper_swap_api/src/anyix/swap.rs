@@ -9,10 +9,11 @@ use anchor_lang::InstructionData;
 use anchor_lang::ToAccountMetas;
 use anyhow::{anyhow, Result};
 
+use juper_swap_cpi::JupiterIx;
 use regex::RegexSet;
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcSendTransactionConfig;
-use solana_sdk::signer::Signer;
+use solana_sdk::{signer::Signer, program_pack::Pack};
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{instruction::Instruction, signature::Signature};
 
@@ -47,6 +48,8 @@ pub fn new_anyix_swap_ix_with_quote(
     // if ture, and transaction setup is required failed
     // otherwise warn
     fail_on_setup: bool,
+    input_mint: Pubkey,
+    output_mint: Pubkey,
 ) -> Result<JupiterAnyIxSwap> {
     let jup_client = crate::Client::new();
     let swap_config = jup_client.swap_with_config(
@@ -80,6 +83,8 @@ pub fn new_anyix_swap_ix_with_quote(
         anyix_program,
         management,
         replacements,
+        input_mint,
+        output_mint
     ) {
         Ok(ix) => Some(ix),
         Err(err) => {
@@ -106,6 +111,8 @@ pub fn new_anyix_swap_with_quote(
     skip_preflight: bool,
     replacements: &HashMap<Pubkey, Pubkey>,
     fail_on_setup: bool,
+    input_mint: Pubkey,
+    output_mint: Pubkey,
 ) -> Result<Signature> {
     let jup_any_ix = new_anyix_swap_ix_with_quote(
         swap_route,
@@ -117,6 +124,8 @@ pub fn new_anyix_swap_with_quote(
         vault_pda,
         replacements,
         fail_on_setup,
+        input_mint,
+        output_mint
     )?;
     let jup_swap_ix = if let Some(swap_ix) = jup_any_ix.swap {
         swap_ix
@@ -205,9 +214,11 @@ pub fn new_anyix_swap(
         })
         .collect::<Vec<_>>();
     if routes.is_empty() {
-        return Err(anyhow!("failed to find any routes"));
+        let error_msg = "failed to find any routes";
+        log::debug!("{}", error_msg);
+        return Err(anyhow!("{}", error_msg));
     }
-    for route in routes.into_iter().take(max_tries) {
+    for (idx, route) in routes.into_iter().take(max_tries).enumerate() {
         let swap_fn = |swap_route: Quote| -> Result<Signature> {
             new_anyix_swap_with_quote(
                 swap_route,
@@ -220,10 +231,16 @@ pub fn new_anyix_swap(
                 skip_preflight,
                 replacements,
                 fail_on_setup,
+                input_mint,
+                output_mint
             )
         };
-        if let Ok(sig) = swap_fn(route.clone()) {
-            return Ok(sig);
+        log::debug!("processing route {}, markets {}", idx, route.formatted_market_infos());
+        match swap_fn(route.clone()) {
+            Ok(sig) => return Ok(sig),
+            Err(err) => {
+                log::debug!("anyix swap failed {:#?}", err);
+            }
         }
     }
     Err(anyhow!("failed to process jupiter swap"))
@@ -239,6 +256,8 @@ pub fn process_transaction(
     anyix_program: Pubkey,
     management: Pubkey,
     replacements: &HashMap<Pubkey, Pubkey>,
+    input_mint: Pubkey,
+    output_mint: Pubkey,
 ) -> Result<Instruction> {
     let mut instructions = decompile_transaction_instructions(tx.clone())?;
     // ensure all instructions invoke a program_id that is whitelisted
@@ -266,7 +285,7 @@ pub fn process_transaction(
                         account.clone()
                     })
                     .collect();
-                let (jup_ix, swap_input) =
+                let (jup_ix, mut  swap_input) =
                     match juper_swap_cpi::process_jupiter_instruction(&ix.data[..]) {
                         Ok(ix) => ix,
                         Err(err) => {
@@ -274,6 +293,36 @@ pub fn process_transaction(
                             return None;
                         }
                     };
+                // for whirlpool swaps we need to manually specify the direction of the swap
+                match jup_ix {
+                    JupiterIx::Whirlpool => {
+                        let token_vault_a = ix.accounts[5].pubkey;
+                        match rpc.get_account_data(&token_vault_a) {
+                            Ok(data) => {
+                                match spl_token::state::Account::unpack_unchecked(&data[..]) {
+                                    Ok(token_vault_a_account) => {
+                                        if token_vault_a_account.mint.eq(&input_mint) {
+                                            log::warn!("whirlpool swap, setting side to 0 (ask)");
+                                            swap_input.side = 0;
+                                        } else if token_vault_a_account.mint.eq(&output_mint) {
+                                            log::warn!("whirlpool swap, setting side to 1 (bid)");
+                                            swap_input.side = 1;
+                                        }
+                                    } 
+                                    Err(err) => {
+                                        log::error!("failed to process jupiter ix {:#?}", err);
+                                        return None;
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                log::error!("failed to process jupiter ix {:#?}", err);
+                                return None;
+                            }
+                        }
+                    }
+                    _ => (),
+                }
                 if let Ok(args) = super::new_jupiter_swap_ix_data(ix.clone(), jup_ix, swap_input) {
                     Some(args)
                 } else {

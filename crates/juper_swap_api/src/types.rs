@@ -111,3 +111,10 @@ pub struct SwapConfig {
     pub fee_account: Option<Pubkey>,
     pub token_ledger: Option<Pubkey>,
 }
+
+
+impl Quote {
+    pub fn formatted_market_infos(&self) -> String {
+        format!("market_infos={:?}", self.market_infos.iter().map(|m_info| &m_info.label).collect::<Vec<_>>())
+    }
+}

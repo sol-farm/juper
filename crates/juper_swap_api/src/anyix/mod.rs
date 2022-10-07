@@ -19,7 +19,8 @@ lazy_static! {
     pub static ref MARKET_BLACKLIST: RegexSet = RegexSet::new(&[
                     // sets case insensitive matching
                     //r"(?i)lifinity",
-                    r"(?i)mercurial",
+                    //r"(?i)mercurial",
+                    r"(?i)goosefx",
     ]).unwrap();
 }
 
@@ -131,14 +132,61 @@ mod test {
             &static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD"),
         )
     }
+    #[test]
+    #[allow(unused_must_use)]
+    fn test_anyix_whirlpool_swap() {
+        TermLogger::init(
+            LevelFilter::Debug,
+            ConfigBuilder::new()
+                .set_location_level(LevelFilter::Debug)
+                .build(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        );
+        let rpc = Arc::new(RpcClient::new("https://ssc-dao.genesysgo.net".to_string()));
+     
+        let usdh_mint = static_pubkey!("USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX");
+        let msol_mint = static_pubkey!("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
 
+        let payer = Keypair::new();
+        let vault_pda = static_pubkey!("663B7xaCqkFKeRKbWwbzcdXoeBLwNS1k5uDFVgUkZwh9");
+        let vault = static_pubkey!("HvRLN4NtVojvM6MicHVnUWCfBZMVWY4mn147LitM27dE");
+        let management = static_pubkey!("De74LEi2qAz5Lk8XTfm7dTRrhwpJVqbCjehLZSPzKfRN");
+        let anyix_program = static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD");
+        let replacements = HashMap::default();
+        // list markets to remove so we can increase the odds of the route aggregator
+        // returning a whirlpool swap
+        let regex_set: RegexSet = RegexSet::new(&[
+            r"(?i)raydium",
+            r"(?i)serum",
+            r"(?i)lifinity",
+        ]).unwrap();
+        super::swap::new_anyix_swap(
+            &rpc,
+            &payer,
+            anyix_program,
+            management,
+            vault,
+            vault_pda,
+            msol_mint,
+            usdh_mint,
+            10.0,
+            false,
+            2,
+            Some(regex_set),
+            &replacements,
+            Slippage::TwentyBip,
+            false,
+        );
+
+    }
     #[test]
     #[allow(unused_must_use)]
     fn test_anyix_swap_override() {
         TermLogger::init(
-            LevelFilter::Info,
+            LevelFilter::Debug,
             ConfigBuilder::new()
-                .set_location_level(LevelFilter::Error)
+                .set_location_level(LevelFilter::Debug)
                 .build(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
@@ -239,7 +287,7 @@ mod test {
         TermLogger::init(
             LevelFilter::Debug,
             ConfigBuilder::new()
-                .set_location_level(LevelFilter::Error)
+                //.set_location_level(LevelFilter::Debug)
                 .build(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
