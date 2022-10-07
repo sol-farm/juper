@@ -43,7 +43,11 @@ pub fn new_anyix_swap_ix_with_quote(
     management: Pubkey,
     vault: Pubkey,
     vault_pda: Pubkey,
+    // a map of keys to replace, and the values to replace them with
     replacements: &HashMap<Pubkey, Pubkey>,
+    // if ture, and transaction setup is required failed
+    // otherwise warn
+    fail_on_setup: bool,
 ) -> Result<JupiterAnyIxSwap> {
     let jup_client = crate::Client::new();
     let swap_config = jup_client.swap_with_config(
@@ -61,8 +65,10 @@ pub fn new_anyix_swap_ix_with_quote(
         cleanup,
     } = swap_config;
     let mut jup_any_ix = JupiterAnyIxSwap::default();
-    if setup.is_some() {
+    if setup.is_some() && !fail_on_setup {
         log::warn!("transaction setup not yet supported");
+    } else if setup.is_some() && fail_on_setup {
+        return Err(anyhow!("abort on transaction setup enabled"));
     }
     jup_any_ix.swap = match process_transaction(
         rpc,
@@ -97,6 +103,7 @@ pub fn new_anyix_swap_with_quote(
     vault_pda: Pubkey,
     skip_preflight: bool,
     replacements: &HashMap<Pubkey, Pubkey>,
+    fail_on_setup: bool,
 ) -> Result<Signature> {
     let jup_any_ix = new_anyix_swap_ix_with_quote(
         swap_route,
@@ -107,6 +114,7 @@ pub fn new_anyix_swap_with_quote(
         vault,
         vault_pda,
         replacements,
+        fail_on_setup,
     )?;
     let jup_swap_ix = if let Some(swap_ix) = jup_any_ix.swap {
         swap_ix
@@ -171,6 +179,7 @@ pub fn new_anyix_swap(
     disallowed_market_list: Option<RegexSet>,
     replacements: &HashMap<Pubkey, Pubkey>,
     slippage: Slippage,
+    fail_on_setup: bool,
 ) -> Result<Signature> {
     let market_blacklist: RegexSet = if let Some(list) = disallowed_market_list {
         list
@@ -208,6 +217,7 @@ pub fn new_anyix_swap(
                 vault_pda,
                 skip_preflight,
                 replacements,
+                fail_on_setup,
             )
         };
         if let Ok(sig) = swap_fn(route.clone()) {

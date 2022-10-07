@@ -237,7 +237,7 @@ mod test {
     #[allow(unused_must_use)]
     fn test_new_anyix_swap() {
         TermLogger::init(
-            LevelFilter::Info,
+            LevelFilter::Debug,
             ConfigBuilder::new()
                 .set_location_level(LevelFilter::Error)
                 .build(),
@@ -288,6 +288,7 @@ mod test {
             None,
             &replacements,
             Slippage::TwentyBip,
+            false,
         );
 
         super::swap::new_anyix_swap(
@@ -305,6 +306,7 @@ mod test {
             None,
             &Default::default(),
             Slippage::TwentyBip,
+            false,
         );
         std::thread::sleep(std::time::Duration::from_secs(1));
         super::swap::new_anyix_swap(
@@ -322,6 +324,7 @@ mod test {
             Some(MARKET_BLACKLIST.clone()),
             &Default::default(),
             Slippage::TwentyBip,
+            false,
         );
         std::thread::sleep(std::time::Duration::from_secs(1));
         super::swap::new_anyix_swap(
@@ -339,6 +342,7 @@ mod test {
             None,
             &Default::default(),
             Slippage::TwentyBip,
+            true,
         );
     }
 }
