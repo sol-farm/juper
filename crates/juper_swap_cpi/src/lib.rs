@@ -161,6 +161,7 @@ pub enum JupiterIx {
     Serum = 9_u8,
     Saber = 10_u8,
     SetTokenLedger = 11_u8,
+    RiskCheckAndFee = 12_u8,
 }
 
 impl From<u8> for JupiterIx {
@@ -178,6 +179,7 @@ impl From<u8> for JupiterIx {
             9 => Self::Serum,
             10 => Self::Saber,
             11 => Self::SetTokenLedger,
+            12 => Self::RiskCheckAndFee,
             _ => panic!("invalid input {}", input),
         }
     }
@@ -198,6 +200,7 @@ impl From<JupiterIx> for u8 {
             JupiterIx::Serum => 9,
             JupiterIx::Saber => 10,
             JupiterIx::SetTokenLedger => 11,
+            JupiterIx::RiskCheckAndFee => 12,
         }
     }
 }
@@ -246,6 +249,8 @@ impl TryFrom<&[u8]> for JupiterIx {
             Ok(Self::Whirlpool)
         } else if ix_data.eq(&SET_TOKEN_LEDGER) {
             Ok(Self::SetTokenLedger)
+        } else if ix_data.eq(&RISK_CHECK_AND_FEE) {
+            Ok(Self::RiskCheckAndFee)
         } else {
             msg!("invalid jupiter ix {:#?}", value);
             Err(ProgramError::InvalidInstructionData)
@@ -397,6 +402,17 @@ impl JupiterIx {
                 }
             },
             JupiterIx::SetTokenLedger => Ok(Default::default()),
+            JupiterIx::RiskCheckAndFee => match instructions::risk_check_and_fee::RiskCheckAndFee::try_from_slice(data) {
+                Ok(input) => Ok(SwapInputs { 
+                    input_amount: None,
+                    min_output: input._minimum_out_amount,
+                    side: 0,
+                }),
+                Err(err) => {
+                    msg!("risk check and fee failed {:#?}", err);
+                    Err(ProgramError::InvalidInstructionData.into())
+                }
+            }
         }
     }
     /// Executes a single swap via the jupiter aggregator program
@@ -785,6 +801,28 @@ impl JupiterIx {
                     data: ix_data,
                 };
                 (ix, saber_swap.to_account_infos(), false)
+            }
+            Self::RiskCheckAndFee => {
+                msg!("processing risk check and fee");
+                let risk_check = accounts::RiskCheckAndFee::try_accounts(
+                    &JUPITER_V3_AGG_ID,
+                    &mut accounts,
+                    &[],
+                    &mut BTreeMap::default(),
+                ).unwrap();
+                let user_dest_account = spl_token::state::Account::unpack(&risk_check.user_destination_token_account.data.borrow()).unwrap();
+                assert!(user_dest_account.owner.eq(&signer));
+                assert!(risk_check.user_transfer_authority.key.eq(&signer));
+                let ix_data = instructions::risk_check_and_fee::RiskCheckAndFee {
+                    _minimum_out_amount: min_output,
+                    _platform_fee_bps: 0,
+                }.data();
+                let ix = Instruction {
+                    program_id: JUPITER_V3_AGG_ID,
+                    accounts: risk_check.to_account_metas(None),
+                    data: ix_data,
+                };
+                (ix, risk_check.to_account_infos(), true)
             }
         };
         if !skip_signer {

@@ -14,7 +14,7 @@ pub const LIFINITY_TOKEN_SWAP: [u8; 8] = [0, 49, 246, 1, 36, 153, 11, 93];
 pub const CYKURA_SWAP: [u8; 8] = [38, 241, 21, 107, 120, 59, 184, 249];
 pub const WHIRLPOOL_SWAP: [u8; 8] = [123, 229, 184, 63, 12, 0, 92, 145];
 pub const SET_TOKEN_LEDGER: [u8; 8] = [228, 85, 185, 112, 78, 79, 77, 2];
-
+pub const RISK_CHECK_AND_FEE: [u8; 8] = [81, 42, 179, 152, 221, 1, 181, 120];
 /// the 8 byte instruction sighash for `jupiter_swap` which is expected ot be in any program
 /// that supports AnyIx
 pub const JUPITER_SWAP_SIGHASH: [u8; 8] = [116, 207, 0, 196, 252, 120, 243, 18];

@@ -9,6 +9,7 @@ pub mod raydium_v2;
 pub mod saber;
 pub mod serum;
 pub mod sighashes;
+pub mod risk_check_and_fee;
 pub mod token_ledger;
 pub mod token_swap;
 pub mod whirlpool;

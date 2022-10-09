@@ -290,6 +290,18 @@ pub struct TokenSwap<'info> {
     pub pool_fee: AccountInfo<'info>,
 }
 
+
+#[derive(Accounts)]
+pub struct RiskCheckAndFee<'info> {
+    #[account(mut)]
+    pub token_ledger: AccountInfo<'info>,
+    #[account(mut)]
+    pub user_destination_token_account: AccountInfo<'info>,
+    //#[account(signer)]
+    pub user_transfer_authority: AccountInfo<'info>,
+    pub token_program: AccountInfo<'info>,
+}
+
 pub struct JupiterSwap {
     /// CHECK: not needed
     //#[account(signer)]
