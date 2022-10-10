@@ -251,6 +251,8 @@ impl TryFrom<&[u8]> for JupiterIx {
             Ok(Self::SetTokenLedger)
         } else if ix_data.eq(&RISK_CHECK_AND_FEE) {
             Ok(Self::RiskCheckAndFee)
+        }  else if ix_data.eq(&ALDRIN_V2_SWAP) {
+            Ok(Self::AldrinV2Swap)
         } else {
             msg!("invalid jupiter ix {:#?}", value);
             Err(ProgramError::InvalidInstructionData)
