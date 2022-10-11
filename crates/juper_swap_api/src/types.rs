@@ -40,7 +40,7 @@ pub struct Quote {
     pub in_amount: u64,
     pub out_amount: u64,
     pub out_amount_with_slippage: u64,
-    pub price_impact_pct: f64,
+    pub price_impact_pct: Option<f64>,
     pub market_infos: Vec<MarketInfo>,
 }
 

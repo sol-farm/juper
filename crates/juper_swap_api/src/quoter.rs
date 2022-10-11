@@ -2,6 +2,7 @@
 
 use std::cmp::Ordering;
 
+use anyhow::anyhow;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{program_pack::Pack, pubkey::Pubkey};
 use spl_token::ui_amount_to_amount;
@@ -93,14 +94,17 @@ impl Quoter {
         slippage: Slippage,
         fees_bps: FeeBps,
     ) -> anyhow::Result<Vec<Quote>> {
-        let mut quotes = crate::Client.quote(
+        let mut quotes = match crate::Client.quote(
             self.input_mint,
             self.output_mint,
             ui_amount_to_amount(ui_amount, self.input_mint_decimals),
             direct,
             slippage,
             fees_bps,
-        )?;
+        ) {
+            Ok(quotes) => quotes,
+            Err(err) => return Err(anyhow!("failed to lookup quote {:#?}", err))
+        };
 
         quotes.data.sort_unstable_by(cmp_quote);
         if !quotes.data.is_empty() {
