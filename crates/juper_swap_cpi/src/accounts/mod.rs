@@ -302,6 +302,28 @@ pub struct RiskCheckAndFee<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
+#[derive(Accounts)]
+pub struct AldrinSwap<'info> {
+    pub swap_program: AccountInfo<'info>,
+    pub pool: AccountInfo<'info>,
+    pub pool_signer: AccountInfo<'info>,
+    #[account(mut)]
+    pub pool_mint: AccountInfo<'info>,
+    #[account(mut)]
+    pub base_token_vault: AccountInfo<'info>,
+    #[account(mut)]
+    pub quote_token_vault: AccountInfo<'info>,
+    #[account(mut)]
+    pub fee_pool_token_account: AccountInfo<'info>,
+    //#[account(signer)]
+    pub wallet_authority: AccountInfo<'info>,
+    #[account(mut)]
+    pub user_base_token_account: AccountInfo<'info>,
+    #[account(mut)]
+    pub user_quote_token_account: AccountInfo<'info>,
+    pub token_program: AccountInfo<'info>,
+}
+
 pub struct JupiterSwap {
     /// CHECK: not needed
     //#[account(signer)]

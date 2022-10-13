@@ -162,6 +162,7 @@ pub enum JupiterIx {
     Saber = 10_u8,
     SetTokenLedger = 11_u8,
     RiskCheckAndFee = 12_u8,
+    AldrinSwap = 13_u8,
 }
 
 impl From<u8> for JupiterIx {
@@ -180,6 +181,7 @@ impl From<u8> for JupiterIx {
             10 => Self::Saber,
             11 => Self::SetTokenLedger,
             12 => Self::RiskCheckAndFee,
+            13 => Self::AldrinSwap,
             _ => panic!("invalid input {}", input),
         }
     }
@@ -201,6 +203,7 @@ impl From<JupiterIx> for u8 {
             JupiterIx::Saber => 10,
             JupiterIx::SetTokenLedger => 11,
             JupiterIx::RiskCheckAndFee => 12,
+            JupiterIx::AldrinSwap => 13,
         }
     }
 }
@@ -286,6 +289,19 @@ impl JupiterIx {
                     }),
                     Err(err) => {
                         msg!("failed to parse aldrinv2 swap {:#?}", err);
+                        Err(ProgramError::InvalidInstructionData.into())
+                    }
+                }
+            }
+            JupiterIx::AldrinSwap => {
+                match instructions::aldrin::AldrinSwap::try_from_slice(data) {
+                    Ok(input) => Ok(SwapInputs {
+                        input_amount: input._in_amount,
+                        min_output: input._minimum_out_amount,
+                        side: 0,
+                    }),
+                    Err(err) => {
+                        msg!("failed to parse aldrin swap {:#?}", err);
                         Err(ProgramError::InvalidInstructionData.into())
                     }
                 }
@@ -481,6 +497,39 @@ impl JupiterIx {
                 assert!(source_token_account.owner.eq(&signer));
                 assert!(dest_token_account.owner.eq(&signer));
                 let ix_data = instructions::aldrin_v2::AldrinV2Swap {
+                    _in_amount: Some(input.unwrap_or(source_token_account.amount)),
+                    _minimum_out_amount: min_output,
+                    _platform_fee_bps: 0,
+                    _side: side,
+                }
+                .data();
+                let ix = Instruction {
+                    program_id: JUPITER_V3_AGG_ID,
+                    accounts: mer_swap.to_account_metas(None),
+                    data: ix_data,
+                };
+                (ix, mer_swap.to_account_infos(), false)
+            }
+            Self::AldrinSwap => {
+                msg!("processing aldrin swap");
+                let mer_swap = accounts::AldrinSwap::try_accounts(
+                    &JUPITER_V3_AGG_ID,
+                    &mut accounts,
+                    &[],
+                    &mut BTreeMap::default(),
+                )
+                .unwrap();
+                let source_token_account = spl_token::state::Account::unpack(
+                    &mer_swap.user_base_token_account.data.borrow(),
+                )
+                .unwrap();
+                let dest_token_account = spl_token::state::Account::unpack(
+                    &mer_swap.user_quote_token_account.data.borrow(),
+                )
+                .unwrap();
+                assert!(source_token_account.owner.eq(&signer));
+                assert!(dest_token_account.owner.eq(&signer));
+                let ix_data = instructions::aldrin::AldrinSwap {
                     _in_amount: Some(input.unwrap_or(source_token_account.amount)),
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
