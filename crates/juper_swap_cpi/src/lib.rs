@@ -58,6 +58,7 @@ pub fn process_instructions<'info>(
             swap_inputs.input_amount,
             swap_inputs.min_output,
             wanted_token_owner,
+            instruction_account_counts[idx as usize] as usize
         );
     }
     Ok(())
@@ -447,6 +448,7 @@ impl JupiterIx {
         input: Option<u64>,
         min_output: u64,
         signer: Pubkey,
+        num_accounts: usize,
     ) {
         let (mut ix, account_infos, skip_signer) = match self {
             Self::TokenSwap => {
@@ -654,9 +656,13 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
+                let mut accounts = mer_swap.to_account_metas(None);
+                if accounts.len() < num_accounts {
+                    let diff = num_accounts.checked_sub(accounts.len()).unwrap();
+                }
                 let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: mer_swap.to_account_metas(None),
+                    accounts, 
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
