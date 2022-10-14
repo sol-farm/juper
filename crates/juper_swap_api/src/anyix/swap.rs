@@ -284,7 +284,7 @@ pub fn new_anyix_swap(
         match swap_fn(route.clone()) {
             Ok(sig) => return Ok(sig),
             Err(err) => {
-                log::debug!("anyix swap failed {:#?}", err);
+                log::error!("anyix swap failed {:#?}", err);
             }
         }
     }
