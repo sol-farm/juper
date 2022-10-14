@@ -320,6 +320,9 @@ pub fn process_transaction(
             return Err(anyhow!("invalid program id {}", ix.program_id));
         }
     }
+    // after filtering out the ata instructions, we need to make sure
+    // that we have the correct number of instructions still
+    let mut expected_instructions = 0;
     let any_ix_args = instructions
         .iter_mut()
         .filter_map(|ix| {
@@ -328,6 +331,9 @@ pub fn process_transaction(
             //
             // however if the instruction is for the ATA program we dont do this
             if ix.program_id.eq(&juper_swap_cpi::JUPITER_V3_AGG_ID) {
+                // increase the expected instructions before attempting decompilation
+                // this will help us catch any swaps that request invalid routes
+                expected_instructions += 1;
                 ix.accounts = ix
                     .accounts
                     .iter_mut()
@@ -379,6 +385,9 @@ pub fn process_transaction(
             }
         })
         .collect::<Vec<_>>();
+    if expected_instructions.ne(&any_ix_args.len()) {
+        return Err(anyhow!("unexpected instruction count. got {}, want {}", any_ix_args.len(), expected_instructions));
+    }
     let mut accounts = juper_swap_cpi::accounts::JupiterSwap {
         vault,
         authority: payer.pubkey(),
