@@ -656,13 +656,14 @@ impl JupiterIx {
                     _platform_fee_bps: 0,
                 }
                 .data();
-                let mut accounts = mer_swap.to_account_metas(None);
-                if accounts.len() < num_accounts {
+                let mut meta_accounts = mer_swap.to_account_metas(None);
+                if meta_accounts.len() < num_accounts {
                     let diff = num_accounts.checked_sub(accounts.len()).unwrap();
+                    meta_accounts.extend_from_slice(&take_accounts_into_metas(&mut accounts, diff)[..]);
                 }
                 let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts, 
+                    accounts: meta_accounts, 
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
@@ -940,6 +941,26 @@ impl JupiterIx {
         }
     }
 }
+
+
+pub fn take_accounts_into_metas<'info>(
+    accounts: &mut &[AccountInfo<'info>],
+    count: usize,
+) -> Vec<AccountMeta> {
+    let mut account_metas = Vec::with_capacity(count);
+    for _ in 0..count {
+        let account = &accounts[0];
+        account_metas.push(if account.is_writable {
+            AccountMeta::new(*account.key, account.is_signer)
+        } else {
+            AccountMeta::new_readonly(*account.key, account.is_signer)
+        });
+        // mutate the slice
+        *accounts = &accounts[1..];
+    }
+   account_metas
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
