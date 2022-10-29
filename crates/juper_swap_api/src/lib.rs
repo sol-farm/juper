@@ -66,11 +66,51 @@ impl Client {
     /// Get simple price for a given input mint, output mint and amount
     pub fn price(
         &self,
-        input_mint: Pubkey,
+        input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-    ) -> anyhow::Result<Response<Price>> {
-        crate::api::API::V1.price(input_mint, output_mint, ui_amount)
+    ) -> anyhow::Result<crate::Response<Vec<Price>>> {
+        crate::api::API::V1.price(input_mints, output_mint, ui_amount)
+    }
+    pub fn batch_price_lookup(
+        &self,
+        input_mints: &[Pubkey],
+        output_mint: Pubkey,
+        ui_amount: Option<f64>,
+    ) -> anyhow::Result<Vec<Price>> {
+        let input_len = input_mints.len();
+        if input_len <= 10 {
+            Ok(crate::api::API::V1.price(input_mints, output_mint, ui_amount)?.data)
+        } else {
+            let chunks = input_mints.chunks(10);
+            let mut prices = Vec::with_capacity(input_len);
+            chunks.into_iter().for_each(|chunk| {
+                if let Ok(price_infos) = crate::api::API::V1.price(chunk, output_mint, ui_amount) {
+                    prices.extend_from_slice(&price_infos.data[..]);
+                } 
+            });
+            Ok(prices)
+        }
+    }
+    pub async fn async_batch_price_lookup(
+        &self,
+        input_mints: &[Pubkey],
+        output_mint: Pubkey,
+        ui_amount: Option<f64>,
+    ) -> anyhow::Result<Vec<Price>> {
+        let input_len = input_mints.len();
+        if input_len <= 10 {
+            Ok(crate::api::API::V1.async_price(input_mints, output_mint, ui_amount).await?.data)
+        } else {
+            let chunks = input_mints.chunks(10);
+            let mut prices = Vec::with_capacity(input_len);
+            for chunk in chunks {
+                if let Ok(price_infos) = crate::api::API::V1.async_price(chunk, output_mint, ui_amount).await {
+                    prices.extend_from_slice(&price_infos.data[..]);
+                } 
+            };
+            Ok(prices)
+        }
     }
 }
 
@@ -127,12 +167,12 @@ impl AsyncClient {
     /// Get simple price for a given input mint, output mint and amount
     pub async fn price(
         &self,
-        input_mint: Pubkey,
+        input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-    ) -> anyhow::Result<Response<Price>> {
+    ) -> anyhow::Result<crate::Response<Vec<Price>>> {
         crate::api::API::V1
-            .async_price(input_mint, output_mint, ui_amount)
+            .async_price(input_mints, output_mint, ui_amount)
             .await
     }
 }
@@ -146,5 +186,42 @@ impl Default for Client {
 impl Default for AsyncClient {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use super::JupAPI;
+    use super::*;
+    #[test]
+    fn test_jupapi_v1() {
+
+        let prices = Client::new().price(
+            &[
+                Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+            ],
+            Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+            None
+        ).unwrap();
+        assert!(prices.data.len() == 2);
+        println!("{:#?}", prices);
+    }
+    #[tokio::test]
+    async fn test_jupapi_v1_async() {
+
+        let prices = AsyncClient::new().price(
+            &[
+                Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+            ],
+            Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+            None
+        ).await.unwrap();
+        assert!(prices.data.len() == 2);
+        println!("{:#?}", prices);
+
     }
 }

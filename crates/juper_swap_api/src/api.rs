@@ -63,7 +63,7 @@ pub trait JupAPI {
         fee_bps: FeeBps,
     ) -> String;
     /// returns a url string used to submit a price request to the api
-    fn price_str(&self, input_mint: Pubkey, output_mint: Pubkey, ui_amount: Option<f64>) -> String;
+    fn price_str(&self, input_mints: &[Pubkey], output_mint: Pubkey, ui_amount: Option<f64>) -> String;
     /// submit a blocking quote request
     fn quote(
         &self,
@@ -105,17 +105,17 @@ pub trait JupAPI {
     /// submit a blocking price request
     fn price(
         &self,
-        input_mint: Pubkey,
+        input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-    ) -> anyhow::Result<crate::Response<Price>>;
+    ) -> anyhow::Result<crate::Response<Vec<Price>>>;
     /// submit a non-blocking price request
     async fn async_price(
         &self,
-        input_mint: Pubkey,
+        input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-    ) -> anyhow::Result<crate::Response<Price>>;
+    ) -> anyhow::Result<crate::Response<Vec<Price>>>;
 }
 
 #[async_trait]
@@ -165,10 +165,14 @@ impl JupAPI for API {
         )
     }
 
-    fn price_str(&self, input_mint: Pubkey, output_mint: Pubkey, ui_amount: Option<f64>) -> String {
+    fn price_str(&self,input_mints: &[Pubkey], output_mint: Pubkey, ui_amount: Option<f64>) -> String {
+        let formatted = format!("{:?}", input_mints);
+        let formatted = formatted.replace('[', "");
+        let formatted = formatted.replace(']', "");
+        let formatted = formatted.replace(" ", "");
         format!(
             "https://quote-api.jup.ag/v1/price?id={}&vsToken={}{}",
-            input_mint,
+            formatted,
             output_mint,
             if let Some(ui_amount) = ui_amount {
                 format!("&amount={}", ui_amount)
@@ -267,20 +271,20 @@ impl JupAPI for API {
     }
     fn price(
         &self,
-        input_mint: Pubkey,
+        input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-    ) -> anyhow::Result<crate::Response<Price>> {
-        let url = self.price_str(input_mint, output_mint, ui_amount);
+    ) -> anyhow::Result<crate::Response<Vec<Price>>> {
+        let url = self.price_str(input_mints, output_mint, ui_amount);
         maybe_jupiter_api_error(self.client().get(url).send()?.json()?)
     }
     async fn async_price(
         &self,
-        input_mint: Pubkey,
+        input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-    ) -> anyhow::Result<crate::Response<Price>> {
-        let url = self.price_str(input_mint, output_mint, ui_amount);
+    ) -> anyhow::Result<crate::Response<Vec<Price>>> {
+        let url = self.price_str(input_mints, output_mint, ui_amount);
         Ok(maybe_jupiter_api_error(
             self.async_client().get(url).send().await?.json().await?,
         )?)
@@ -340,6 +344,8 @@ impl API {
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
     use super::JupAPI;
     use super::*;
     #[tokio::test]
@@ -359,5 +365,15 @@ mod test {
 
         let got = api_version.swap_str();
         assert_eq!(got, "https://quote-api.jup.ag/v1/swap");
+
+        let price = api_version.price_str(
+            &[
+                Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+            ],
+            Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+            None
+        );
+        assert_eq!(price, "https://quote-api.jup.ag/v1/price?id=So11111111111111111111111111111111111111112,EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
     }
 }
