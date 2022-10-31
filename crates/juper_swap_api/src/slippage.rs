@@ -1,4 +1,6 @@
-#[derive(Clone, Copy, Debug)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Slippage {
     Zero,               // NA, but more specifically an empty string
     ZeroBip,            // 0%
@@ -14,6 +16,7 @@ pub enum Slippage {
     OneHundredFiftyBip, // 1.50%
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum FeeBps {
     Zero,               // 0%, but more specifically an empty string
     OneBip,             // 0.01%
