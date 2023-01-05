@@ -69,25 +69,45 @@ impl Client {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-    ) -> anyhow::Result<crate::Response<Vec<Price>>> {
-        crate::api::API::V1.price(input_mints, output_mint, ui_amount)
+        v4: bool,
+    ) -> anyhow::Result<Vec<Price>> {
+        if v4 {
+            crate::api::API::V4.price(input_mints, output_mint, ui_amount)
+        } else {
+            crate::api::API::V1.price(input_mints, output_mint, ui_amount)
+        }
     }
     pub fn batch_price_lookup(
         &self,
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
+        v4: bool,
     ) -> anyhow::Result<Vec<Price>> {
         let input_len = input_mints.len();
         if input_len <= 10 {
-            Ok(crate::api::API::V1.price(input_mints, output_mint, ui_amount)?.data)
+            if v4 {
+                return crate::api::API::V4.price(input_mints, output_mint, ui_amount);
+            } else {
+                return crate::api::API::V1.price(input_mints, output_mint, ui_amount);
+            }
         } else {
             let chunks = input_mints.chunks(10);
             let mut prices = Vec::with_capacity(input_len);
             chunks.into_iter().for_each(|chunk| {
-                if let Ok(price_infos) = crate::api::API::V1.price(chunk, output_mint, ui_amount) {
-                    prices.extend_from_slice(&price_infos.data[..]);
-                } 
+                if v4 {
+                    if let Ok(price_infos) =
+                        crate::api::API::V4.price(chunk, output_mint, ui_amount)
+                    {
+                        prices.extend_from_slice(&price_infos[..]);
+                    }
+                } else {
+                    if let Ok(price_infos) =
+                        crate::api::API::V1.price(chunk, output_mint, ui_amount)
+                    {
+                        prices.extend_from_slice(&price_infos[..]);
+                    }
+                }
             });
             Ok(prices)
         }
@@ -97,18 +117,39 @@ impl Client {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
+        v4: bool,
     ) -> anyhow::Result<Vec<Price>> {
         let input_len = input_mints.len();
         if input_len <= 10 {
-            Ok(crate::api::API::V1.async_price(input_mints, output_mint, ui_amount).await?.data)
+            if v4 {
+                return Ok(crate::api::API::V4
+                    .async_price(input_mints, output_mint, ui_amount)
+                    .await?);
+            } else {
+                return Ok(crate::api::API::V1
+                    .async_price(input_mints, output_mint, ui_amount)
+                    .await?);
+            }
         } else {
             let chunks = input_mints.chunks(10);
             let mut prices = Vec::with_capacity(input_len);
             for chunk in chunks {
-                if let Ok(price_infos) = crate::api::API::V1.async_price(chunk, output_mint, ui_amount).await {
-                    prices.extend_from_slice(&price_infos.data[..]);
-                } 
-            };
+                if v4 {
+                    if let Ok(price_infos) = crate::api::API::V4
+                        .async_price(chunk, output_mint, ui_amount)
+                        .await
+                    {
+                        prices.extend_from_slice(&price_infos[..]);
+                    }
+                } else {
+                    if let Ok(price_infos) = crate::api::API::V1
+                        .async_price(chunk, output_mint, ui_amount)
+                        .await
+                    {
+                        prices.extend_from_slice(&price_infos[..]);
+                    }
+                }
+            }
             Ok(prices)
         }
     }
@@ -170,10 +211,17 @@ impl AsyncClient {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-    ) -> anyhow::Result<crate::Response<Vec<Price>>> {
-        crate::api::API::V1
-            .async_price(input_mints, output_mint, ui_amount)
-            .await
+        v4: bool,
+    ) -> anyhow::Result<Vec<Price>> {
+        if v4 {
+            crate::api::API::V4
+                .async_price(input_mints, output_mint, ui_amount)
+                .await
+        } else {
+            crate::api::API::V1
+                .async_price(input_mints, output_mint, ui_amount)
+                .await
+        }
     }
 }
 
@@ -197,31 +245,63 @@ mod test {
     use super::*;
     #[test]
     fn test_jupapi_v1() {
-
-        let prices = Client::new().price(
-            &[
-                Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+        let prices = Client::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-            ],
-            Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-            None
-        ).unwrap();
-        assert!(prices.data.len() == 2);
+                None,
+                false,
+            )
+            .unwrap();
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+
+        let prices = Client::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                true,
+            )
+            .unwrap();
+        assert!(prices.len() == 2);
         println!("{:#?}", prices);
     }
     #[tokio::test]
     async fn test_jupapi_v1_async() {
-
-        let prices = AsyncClient::new().price(
-            &[
-                Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+        let prices = AsyncClient::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-            ],
-            Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-            None
-        ).await.unwrap();
-        assert!(prices.data.len() == 2);
+                None,
+                false,
+            )
+            .await
+            .unwrap();
+        assert!(prices.len() == 2);
         println!("{:#?}", prices);
-
+        let prices = AsyncClient::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                true,
+            )
+            .await
+            .unwrap();
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
     }
 }
