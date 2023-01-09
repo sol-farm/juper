@@ -7,14 +7,14 @@ edition = "2021"
 license = "Apache-2.0"
 readme = "../../README.md"
 repository = "https://github.com/sol-farm/juperr"
-version = "0.0.23"
+version = "0.0.24"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-solana-program = "1.9"
+solana-program = "1.13"
 static-pubkey = "1.0.2"
 anyix = "0.1.1"
-anchor-lang = "0.24"
+anchor-lang = "0.26"
 borsh = "0.9"
 spl-token = "3"
