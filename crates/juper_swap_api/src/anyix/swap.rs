@@ -13,12 +13,9 @@ use juper_swap_cpi::JupiterIx;
 use regex::RegexSet;
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcSendTransactionConfig;
-use solana_sdk::transaction::Transaction;
+use solana_sdk::{transaction::Transaction, serialize_utils};
 use solana_sdk::{instruction::Instruction, signature::Signature};
 use solana_sdk::{program_pack::Pack, signer::Signer};
-
-#[cfg(test)]
-use solana_client::rpc_client::serialize_and_encode;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -159,15 +156,7 @@ pub fn new_anyix_swap_with_quote(
     };
     let mut tx = Transaction::new_with_payer(&[jup_swap_ix], Some(&payer.pubkey()));
 
-    #[cfg(test)]
-    println!(
-        "encoded jupiter tx {}",
-        serialize_and_encode(
-            &tx,
-            solana_transaction_status::UiTransactionEncoding::Base64
-        )
-        .unwrap()
-    );
+
 
     tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
     log::debug!("sending jupiter swap ix");

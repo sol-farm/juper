@@ -206,7 +206,7 @@ mod test {
                 .map(|compiled_ix| {
                     Instruction::new_with_bytes(
                         *sanitized_msg
-                            .get_account_key(compiled_ix.program_id_index.into())
+                            .account_keys().get(compiled_ix.program_id_index.into())
                             .ok_or(InstructionError::MissingAccount)
                             .unwrap(),
                         &compiled_ix.data,
@@ -219,7 +219,7 @@ mod test {
                                     is_signer: sanitized_msg.is_signer(account_index),
                                     is_writable: sanitized_msg.is_writable(account_index),
                                     pubkey: *sanitized_msg
-                                        .get_account_key(account_index)
+                                        .account_keys().get(account_index)
                                         .ok_or(InstructionError::MissingAccount)
                                         .unwrap(),
                                 })
