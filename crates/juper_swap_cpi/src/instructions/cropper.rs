@@ -42,3 +42,9 @@ impl anchor_lang::InstructionData for CropperTokenSwap {
         d
     }
 }
+impl anchor_lang::Discriminator for CropperTokenSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::CROPPER_TOKEN_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

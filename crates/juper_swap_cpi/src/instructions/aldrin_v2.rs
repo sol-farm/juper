@@ -1,4 +1,5 @@
 use crate::Side;
+use anchor_lang::Discriminator;
 use borsh::{self, BorshSerialize};
 /// Instruction.
 pub struct AldrinV2Swap {
@@ -46,5 +47,11 @@ impl anchor_lang::InstructionData for AldrinV2Swap {
         let mut d = super::sighashes::ALDRIN_V2_SWAP.to_vec();
         d.append(&mut self.try_to_vec().expect("Should always serialize"));
         d
+    }
+}
+impl anchor_lang::Discriminator for AldrinV2Swap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::ALDRIN_V2_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
     }
 }

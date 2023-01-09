@@ -62,3 +62,11 @@ impl anchor_lang::InstructionData for JupiterSwapArgs {
         d
     }
 }
+
+
+impl anchor_lang::Discriminator for JupiterSwapArgs {
+    const DISCRIMINATOR: [u8; 8] = sighashes::JUPITER_SWAP_SIGHASH;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

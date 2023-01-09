@@ -43,3 +43,11 @@ impl anchor_lang::InstructionData for RaydiumSwap {
         d
     }
 }
+
+
+impl anchor_lang::Discriminator for RaydiumSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::RAYDIUM_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

@@ -43,3 +43,9 @@ impl anchor_lang::InstructionData for CykuraSwap {
         d
     }
 }
+impl anchor_lang::Discriminator for CykuraSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::CYKURA_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

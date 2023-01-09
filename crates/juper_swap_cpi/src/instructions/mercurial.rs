@@ -43,3 +43,10 @@ impl anchor_lang::InstructionData for MercurialExchange {
         d
     }
 }
+
+impl anchor_lang::Discriminator for MercurialExchange {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::MERCURIAL_EXCHANGE;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

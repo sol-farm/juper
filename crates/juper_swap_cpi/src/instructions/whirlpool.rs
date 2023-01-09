@@ -48,3 +48,10 @@ impl anchor_lang::InstructionData for WhirlpoolSwap {
         d
     }
 }
+
+impl anchor_lang::Discriminator for WhirlpoolSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::WHIRLPOOL_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

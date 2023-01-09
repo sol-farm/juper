@@ -40,3 +40,9 @@ use anchor_lang::prelude::*;
             d
         }
     }
+    impl anchor_lang::Discriminator for RiskCheckAndFee {
+        const DISCRIMINATOR: [u8; 8] = super::sighashes::RISK_CHECK_AND_FEE;
+        fn discriminator() -> [u8; 8] {
+            Self::DISCRIMINATOR
+        }
+    }

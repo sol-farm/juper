@@ -42,3 +42,12 @@ impl anchor_lang::InstructionData for TokenSwap {
         d
     }
 }
+
+
+
+impl anchor_lang::Discriminator for TokenSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::SET_TOKEN_LEDGER;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

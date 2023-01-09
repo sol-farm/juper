@@ -43,3 +43,12 @@ impl anchor_lang::InstructionData for SaberSwap {
         d
     }
 }
+
+
+
+impl anchor_lang::Discriminator for SaberSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::SABER_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

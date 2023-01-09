@@ -48,3 +48,9 @@ impl anchor_lang::InstructionData for AldrinSwap {
         d
     }
 }
+impl anchor_lang::Discriminator for AldrinSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::ALDRIN_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

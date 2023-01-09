@@ -49,3 +49,10 @@ impl anchor_lang::InstructionData for SerumSwap {
         d
     }
 }
+
+impl anchor_lang::Discriminator for SerumSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::SERUM_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

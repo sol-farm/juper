@@ -43,3 +43,10 @@ impl anchor_lang::InstructionData for LifinityTokenSwap {
         d
     }
 }
+
+impl anchor_lang::Discriminator for LifinityTokenSwap {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::LIFINITY_TOKEN_SWAP;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}

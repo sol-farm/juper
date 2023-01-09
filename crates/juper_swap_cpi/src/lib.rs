@@ -17,7 +17,7 @@ pub const ID: Pubkey = JUPITER_V3_AGG_ID;
 use anchor_lang::{prelude::*, InstructionData};
 
 use solana_program::{instruction::Instruction, program_pack::Pack};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The reference implementation of the AnyIx instruction parser for use with
 /// the juper_swap_cpi crate. It performs basic access controls, ensuring
@@ -458,6 +458,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account =
@@ -486,6 +487,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account = spl_token::state::Account::unpack(
@@ -519,6 +521,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account = spl_token::state::Account::unpack(
@@ -552,6 +555,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account =
@@ -580,6 +584,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account =
@@ -610,6 +615,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account =
@@ -639,6 +645,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account =
@@ -675,6 +682,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account = spl_token::state::Account::unpack(
@@ -707,6 +715,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account = spl_token::state::Account::unpack(
@@ -739,6 +748,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account = spl_token::state::Account::unpack(
@@ -772,6 +782,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 // serum swaps require open order accounts, which we implement via our serum trade account
@@ -815,6 +826,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let token_account =
@@ -836,6 +848,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 )
                 .unwrap();
                 let source_token_account =
@@ -867,6 +880,7 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
+                    &mut BTreeSet::default()
                 ).unwrap();
                 let user_dest_account = spl_token::state::Account::unpack(&risk_check.user_destination_token_account.data.borrow()).unwrap();
                 assert!(user_dest_account.owner.eq(&signer));

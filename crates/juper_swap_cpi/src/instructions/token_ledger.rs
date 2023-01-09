@@ -22,3 +22,12 @@ impl anchor_lang::InstructionData for SetTokenLedger {
         d
     }
 }
+
+
+
+impl anchor_lang::Discriminator for SetTokenLedger {
+    const DISCRIMINATOR: [u8; 8] = super::sighashes::SET_TOKEN_LEDGER;
+    fn discriminator() -> [u8; 8] {
+        Self::DISCRIMINATOR
+    }
+}
