@@ -26,7 +26,7 @@ pub enum API {
     V1,
     V2,
     V3,
-    V4,
+    V6,
 }
 
 impl API {
@@ -133,14 +133,14 @@ impl JupAPI for API {
     fn route_map_str<'a>(&self, direct: bool) -> &'a str {
         match self {
             // for v1 -> v3  same url is used
-            Self::V1 | Self::V2 | Self::V3 | Self::V4 => {
+            Self::V1 | Self::V2 | Self::V3 | Self::V6 => {
                 if direct {
                     const DIRECT: &str =
-                        "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=true";
+                        "https://quote-api.jup.ag/v6/indexed-route-map?onlyDirectRoutes=true";
                     DIRECT
                 } else {
                     const NOT_DIRECT: &str =
-                        "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=false";
+                        "https://quote-api.jup.ag/v6/indexed-route-map?onlyDirectRoutes=false";
                     NOT_DIRECT
                 }
             }
@@ -149,8 +149,8 @@ impl JupAPI for API {
     fn swap_str<'a>(&self) -> &'a str {
         match self {
             // for v1 -> v3  same url is used
-            Self::V1 | Self::V2 | Self::V3 | Self::V4 => {
-                const SWAP: &str = "https://quote-api.jup.ag/v1/swap";
+            Self::V1 | Self::V2 | Self::V3 | Self::V6 => {
+                const SWAP: &str = "https://quote-api.jup.ag/v6/swap";
                 SWAP
             }
         }
@@ -165,7 +165,7 @@ impl JupAPI for API {
         fees_bps: FeeBps,
     ) -> String {
         format!(
-            "https://quote-api.jup.ag/v1/quote?inputMint={}&outputMint={}&amount={}&onlyDirectRoutes={}&{}{}",
+            "https://quote-api.jup.ag/v6/quote?inputMint={}&outputMint={}&amount={}&onlyDirectRoutes={}&{}{}",
             input_mint,
             output_mint,
             amount,
@@ -186,7 +186,7 @@ impl JupAPI for API {
         let formatted = formatted.replace(']', "");
         let formatted = formatted.replace(" ", "");
         match self {
-            Self::V4 => {
+            Self::V6 => {
                 format!(
                     "https://price.jup.ag/v4/price?ids={}&vsToken={}{}",
                     formatted,
@@ -200,7 +200,7 @@ impl JupAPI for API {
             }
             _ => {
                 format!(
-                    "https://quote-api.jup.ag/v1/price?id={}&vsToken={}{}",
+                    "https://quote-api.jup.ag/v6/price?id={}&vsToken={}{}",
                     formatted,
                     output_mint,
                     if let Some(ui_amount) = ui_amount {
@@ -307,7 +307,7 @@ impl JupAPI for API {
         ui_amount: Option<f64>,
     ) -> anyhow::Result<Vec<Price>> {
         let url = self.price_str(input_mints, output_mint, ui_amount);
-        if self.eq(&Self::V4) {
+        if self.eq(&Self::V6) {
             let res: crate::Response<HashMap<String, Price>> =
                 maybe_jupiter_api_error(self.client().get(url).send()?.json()?)?;
             Ok(res.data.into_values().collect::<Vec<_>>())
@@ -324,7 +324,7 @@ impl JupAPI for API {
         ui_amount: Option<f64>,
     ) -> anyhow::Result<Vec<Price>> {
         let url = self.price_str(input_mints, output_mint, ui_amount);
-        if self.eq(&Self::V4) {
+        if self.eq(&Self::V6) {
             let res: crate::Response<HashMap<String, Price>> =
                 maybe_jupiter_api_error(self.async_client().get(url).send().await?.json().await?)?;
             Ok(res.data.into_values().collect::<Vec<_>>())
@@ -394,22 +394,22 @@ mod test {
     use super::JupAPI;
     use super::*;
     #[tokio::test]
-    async fn test_jupapi_v1() {
+    async fn test_jupapi_v6() {
         let api_version = API::V1;
 
         let got = api_version.route_map_str(true);
         assert_eq!(
             got,
-            "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=true"
+            "https://quote-api.jup.ag/v6/indexed-route-map?onlyDirectRoutes=true"
         );
         let got = api_version.route_map_str(false);
         assert_eq!(
             got,
-            "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=false"
+            "https://quote-api.jup.ag/v6/indexed-route-map?onlyDirectRoutes=false"
         );
 
         let got = api_version.swap_str();
-        assert_eq!(got, "https://quote-api.jup.ag/v1/swap");
+        assert_eq!(got, "https://quote-api.jup.ag/v6/swap");
 
         let price = api_version.price_str(
             &[
@@ -419,6 +419,6 @@ mod test {
             Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
             None,
         );
-        assert_eq!(price, "https://quote-api.jup.ag/v1/price?id=So11111111111111111111111111111111111111112,EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+        assert_eq!(price, "https://quote-api.jup.ag/v6/price?id=So11111111111111111111111111111111111111112,EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
     }
 }

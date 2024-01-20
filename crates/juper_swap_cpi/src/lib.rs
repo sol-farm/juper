@@ -10,9 +10,12 @@ use instructions::Side;
 
 /// the program id of the v3 jupiter aggregator
 pub const JUPITER_V3_AGG_ID: Pubkey = static_pubkey!("JUP3c2Uh3WA4Ng34tw6kPd2G4C5BB21Xo36Je1s32Ph");
+/// the program id of the v6 jupiter aggregator
+pub const JUPITER_V6_AGG_ID: Pubkey = static_pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+pub const JUPITER_AGG_IDS: [Pubkey; 2] = [JUPITER_V3_AGG_ID, JUPITER_V6_AGG_ID];
 
 /// alias to satisfy anchor codegen requirements
-pub const ID: Pubkey = JUPITER_V3_AGG_ID;
+///pub const ID: Pubkey = JUPITER_V6_AGG_ID;
 
 use anchor_lang::{prelude::*, InstructionData};
 
@@ -34,7 +37,10 @@ pub fn process_instructions<'info>(
     data: &[u8],
     seeds: Option<&[&[&[u8]]]>,
 ) -> Result<()> {
-    assert!(jupiter_program_account.key.eq(&JUPITER_V3_AGG_ID));
+    /// ensure an acceptable programId is being used
+    assert!(
+        JUPITER_AGG_IDS.contains(jupiter_program_account.key)
+    );
 
     let any_ix = anyix::AnyIx::unpack(data)?;
     let anyix::AnyIx {

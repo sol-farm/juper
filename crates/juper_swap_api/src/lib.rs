@@ -69,10 +69,10 @@ impl Client {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-        v4: bool,
+        v6: bool,
     ) -> anyhow::Result<Vec<Price>> {
-        if v4 {
-            crate::api::API::V4.price(input_mints, output_mint, ui_amount)
+        if v6 {
+            crate::api::API::V6.price(input_mints, output_mint, ui_amount)
         } else {
             crate::api::API::V1.price(input_mints, output_mint, ui_amount)
         }
@@ -82,12 +82,12 @@ impl Client {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-        v4: bool,
+        v6: bool,
     ) -> anyhow::Result<Vec<Price>> {
         let input_len = input_mints.len();
         if input_len <= 10 {
-            if v4 {
-                return crate::api::API::V4.price(input_mints, output_mint, ui_amount);
+            if v6 {
+                return crate::api::API::V6.price(input_mints, output_mint, ui_amount);
             } else {
                 return crate::api::API::V1.price(input_mints, output_mint, ui_amount);
             }
@@ -95,9 +95,9 @@ impl Client {
             let chunks = input_mints.chunks(10);
             let mut prices = Vec::with_capacity(input_len);
             chunks.into_iter().for_each(|chunk| {
-                if v4 {
+                if v6 {
                     if let Ok(price_infos) =
-                        crate::api::API::V4.price(chunk, output_mint, ui_amount)
+                        crate::api::API::V6.price(chunk, output_mint, ui_amount)
                     {
                         prices.extend_from_slice(&price_infos[..]);
                     }
@@ -117,12 +117,12 @@ impl Client {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-        v4: bool,
+        v6: bool,
     ) -> anyhow::Result<Vec<Price>> {
         let input_len = input_mints.len();
         if input_len <= 10 {
-            if v4 {
-                return Ok(crate::api::API::V4
+            if v6 {
+                return Ok(crate::api::API::V6
                     .async_price(input_mints, output_mint, ui_amount)
                     .await?);
             } else {
@@ -134,8 +134,8 @@ impl Client {
             let chunks = input_mints.chunks(10);
             let mut prices = Vec::with_capacity(input_len);
             for chunk in chunks {
-                if v4 {
-                    if let Ok(price_infos) = crate::api::API::V4
+                if v6 {
+                    if let Ok(price_infos) = crate::api::API::V6
                         .async_price(chunk, output_mint, ui_amount)
                         .await
                     {
@@ -211,10 +211,10 @@ impl AsyncClient {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-        v4: bool,
+        v6: bool,
     ) -> anyhow::Result<Vec<Price>> {
-        if v4 {
-            crate::api::API::V4
+        if v6 {
+            crate::api::API::V6
                 .async_price(input_mints, output_mint, ui_amount)
                 .await
         } else {
@@ -253,7 +253,7 @@ mod test {
                 ],
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
                 None,
-                false,
+                true,
             )
             .unwrap();
         assert!(prices.len() == 2);
@@ -283,10 +283,10 @@ mod test {
                 ],
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
                 None,
-                false,
+                true,
             )
             .await
-            .unwrap();
+            .expect("failed to query price");
         assert!(prices.len() == 2);
         println!("{:#?}", prices);
         let prices = AsyncClient::new()
