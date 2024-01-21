@@ -290,7 +290,6 @@ pub struct TokenSwap<'info> {
     pub pool_fee: AccountInfo<'info>,
 }
 
-
 #[derive(Accounts)]
 pub struct RiskCheckAndFee<'info> {
     #[account(mut)]

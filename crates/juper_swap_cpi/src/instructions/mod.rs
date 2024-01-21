@@ -6,12 +6,13 @@ pub mod lifinity;
 pub mod mercurial;
 pub mod raydium;
 pub mod raydium_v2;
+pub mod risk_check_and_fee;
 pub mod saber;
 pub mod serum;
 pub mod sighashes;
-pub mod risk_check_and_fee;
 pub mod token_ledger;
 pub mod token_swap;
+pub mod v6_ixs;
 pub mod whirlpool;
 
 use anchor_lang::prelude::*;

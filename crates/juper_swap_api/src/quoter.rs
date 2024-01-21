@@ -8,6 +8,7 @@ use solana_sdk::{program_pack::Pack, pubkey::Pubkey};
 use spl_token::ui_amount_to_amount;
 
 use crate::{
+    api::API,
     slippage::{FeeBps, Slippage},
     types::Quote,
 };
@@ -59,6 +60,7 @@ impl Quoter {
         direct: bool,
         slippage: Slippage,
         fees_bps: FeeBps,
+        version: API,
     ) -> anyhow::Result<Vec<Quote>> {
         let mut quotes = crate::AsyncClient
             .quote(
@@ -68,6 +70,7 @@ impl Quoter {
                 direct,
                 slippage,
                 fees_bps,
+                version,
             )
             .await?;
         quotes.data.sort_unstable_by(cmp_quote);
@@ -93,6 +96,7 @@ impl Quoter {
         direct: bool,
         slippage: Slippage,
         fees_bps: FeeBps,
+        version: API,
     ) -> anyhow::Result<Vec<Quote>> {
         let mut quotes = match crate::Client.quote(
             self.input_mint,
@@ -101,9 +105,10 @@ impl Quoter {
             direct,
             slippage,
             fees_bps,
+            version,
         ) {
             Ok(quotes) => quotes,
-            Err(err) => return Err(anyhow!("failed to lookup quote {:#?}", err))
+            Err(err) => return Err(anyhow!("failed to lookup quote {:#?}", err)),
         };
 
         quotes.data.sort_unstable_by(cmp_quote);

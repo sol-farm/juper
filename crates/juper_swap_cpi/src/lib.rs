@@ -3,7 +3,11 @@
 pub mod accounts;
 pub mod instructions;
 
-use solana_program::{self, pubkey::Pubkey};
+use solana_program::{
+    self,
+    program::{invoke, invoke_signed},
+    pubkey::Pubkey,
+};
 use static_pubkey::static_pubkey;
 
 use instructions::Side;
@@ -16,7 +20,6 @@ pub const JUPITER_AGG_IDS: [Pubkey; 2] = [JUPITER_V3_AGG_ID, JUPITER_V6_AGG_ID];
 
 /// alias to satisfy anchor codegen requirements
 ///pub const ID: Pubkey = JUPITER_V6_AGG_ID;
-
 use anchor_lang::{prelude::*, InstructionData};
 
 use solana_program::{instruction::Instruction, program_pack::Pack};
@@ -37,10 +40,12 @@ pub fn process_instructions<'info>(
     data: &[u8],
     seeds: Option<&[&[&[u8]]]>,
 ) -> Result<()> {
-    /// ensure an acceptable programId is being used
-    assert!(
-        JUPITER_AGG_IDS.contains(jupiter_program_account.key)
-    );
+    // ensure an acceptable programId is being used
+    assert!(JUPITER_AGG_IDS.contains(jupiter_program_account.key));
+
+    if jupiter_program_account.key.eq(&JUPITER_V6_AGG_ID) {
+        return process_v6_swap(&remaining_accounts, jupiter_program_account, data, seeds);
+    }
 
     let any_ix = anyix::AnyIx::unpack(data)?;
     let anyix::AnyIx {
@@ -64,7 +69,7 @@ pub fn process_instructions<'info>(
             swap_inputs.input_amount,
             swap_inputs.min_output,
             wanted_token_owner,
-            instruction_account_counts[idx as usize] as usize
+            instruction_account_counts[idx as usize] as usize,
         );
     }
     Ok(())
@@ -89,6 +94,55 @@ pub fn decode_jupiter_instruction(input: &[u8]) -> Result<(JupiterIx, SwapInputs
             },
         ))
     }
+}
+
+pub fn process_v6_swap<'info>(
+    remaining_accounts: &[AccountInfo],
+    jupiter_program: &AccountInfo<'info>,
+    data: &[u8],
+    seeds: Option<&[&[&[u8]]]>,
+) -> Result<()> {
+    // ensure we are only swapping against the v6 program id
+    assert!(jupiter_program.key.eq(&JUPITER_V6_AGG_ID));
+    // validate the instruction sighash
+    assert!(instructions::v6_ixs::V6_AGG_SIGHASHES.contains(&data[0..8].try_into().unwrap()));
+
+    let accounts: Vec<AccountMeta> = remaining_accounts
+        .iter()
+        .map(|acc| AccountMeta {
+            pubkey: *acc.key,
+            is_signer: acc.is_signer,
+            is_writable: acc.is_writable,
+        })
+        .collect();
+
+    let accounts_infos: Vec<AccountInfo> = remaining_accounts
+        .iter()
+        .map(|acc| AccountInfo { ..acc.clone() })
+        .collect();
+
+    // TODO: Check the first 8 bytes. Only Jupiter Route CPI allowed.
+    if let Some(seeds) = seeds {
+        invoke_signed(
+            &Instruction {
+                program_id: *jupiter_program.key,
+                accounts,
+                data: data.to_vec(),
+            },
+            &accounts_infos,
+            seeds,
+        )?;
+    } else {
+        invoke(
+            &Instruction {
+                program_id: *jupiter_program.key,
+                accounts,
+                data: data.to_vec(),
+            },
+            &accounts_infos,
+        )?;
+    }
+    Ok(())
 }
 
 /// Wraps the input values for a given swap
@@ -261,7 +315,7 @@ impl TryFrom<&[u8]> for JupiterIx {
             Ok(Self::SetTokenLedger)
         } else if ix_data.eq(&RISK_CHECK_AND_FEE) {
             Ok(Self::RiskCheckAndFee)
-        }  else if ix_data.eq(&ALDRIN_V2_SWAP) {
+        } else if ix_data.eq(&ALDRIN_V2_SWAP) {
             Ok(Self::AldrinV2Swap)
         } else {
             msg!("invalid jupiter ix {:#?}", value);
@@ -300,19 +354,17 @@ impl JupiterIx {
                     }
                 }
             }
-            JupiterIx::AldrinSwap => {
-                match instructions::aldrin::AldrinSwap::try_from_slice(data) {
-                    Ok(input) => Ok(SwapInputs {
-                        input_amount: input._in_amount,
-                        min_output: input._minimum_out_amount,
-                        side: 0,
-                    }),
-                    Err(err) => {
-                        msg!("failed to parse aldrin swap {:#?}", err);
-                        Err(ProgramError::InvalidInstructionData.into())
-                    }
+            JupiterIx::AldrinSwap => match instructions::aldrin::AldrinSwap::try_from_slice(data) {
+                Ok(input) => Ok(SwapInputs {
+                    input_amount: input._in_amount,
+                    min_output: input._minimum_out_amount,
+                    side: 0,
+                }),
+                Err(err) => {
+                    msg!("failed to parse aldrin swap {:#?}", err);
+                    Err(ProgramError::InvalidInstructionData.into())
                 }
-            }
+            },
             JupiterIx::CropperTokenSwap => {
                 match instructions::cropper::CropperTokenSwap::try_from_slice(data) {
                     Ok(input) => Ok(SwapInputs {
@@ -427,15 +479,17 @@ impl JupiterIx {
                 }
             },
             JupiterIx::SetTokenLedger => Ok(Default::default()),
-            JupiterIx::RiskCheckAndFee => match instructions::risk_check_and_fee::RiskCheckAndFee::try_from_slice(data) {
-                Ok(input) => Ok(SwapInputs { 
-                    input_amount: None,
-                    min_output: input._minimum_out_amount,
-                    side: 0,
-                }),
-                Err(err) => {
-                    msg!("risk check and fee failed {:#?}", err);
-                    Err(ProgramError::InvalidInstructionData.into())
+            JupiterIx::RiskCheckAndFee => {
+                match instructions::risk_check_and_fee::RiskCheckAndFee::try_from_slice(data) {
+                    Ok(input) => Ok(SwapInputs {
+                        input_amount: None,
+                        min_output: input._minimum_out_amount,
+                        side: 0,
+                    }),
+                    Err(err) => {
+                        msg!("risk check and fee failed {:#?}", err);
+                        Err(ProgramError::InvalidInstructionData.into())
+                    }
                 }
             }
         }
@@ -665,11 +719,12 @@ impl JupiterIx {
                 let mut meta_accounts = mer_swap.to_account_metas(None);
                 if meta_accounts.len() < num_accounts {
                     let diff = num_accounts.checked_sub(accounts.len()).unwrap();
-                    meta_accounts.extend_from_slice(&take_accounts_into_metas(&mut accounts, diff)[..]);
+                    meta_accounts
+                        .extend_from_slice(&take_accounts_into_metas(&mut accounts, diff)[..]);
                 }
                 let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
-                    accounts: meta_accounts, 
+                    accounts: meta_accounts,
                     data: ix_data,
                 };
                 (ix, mer_swap.to_account_infos(), false)
@@ -873,14 +928,19 @@ impl JupiterIx {
                     &mut accounts,
                     &[],
                     &mut BTreeMap::default(),
-                ).unwrap();
-                let user_dest_account = spl_token::state::Account::unpack(&risk_check.user_destination_token_account.data.borrow()).unwrap();
+                )
+                .unwrap();
+                let user_dest_account = spl_token::state::Account::unpack(
+                    &risk_check.user_destination_token_account.data.borrow(),
+                )
+                .unwrap();
                 assert!(user_dest_account.owner.eq(&signer));
                 assert!(risk_check.user_transfer_authority.key.eq(&signer));
                 let ix_data = instructions::risk_check_and_fee::RiskCheckAndFee {
                     _minimum_out_amount: min_output,
                     _platform_fee_bps: 0,
-                }.data();
+                }
+                .data();
                 let ix = Instruction {
                     program_id: JUPITER_V3_AGG_ID,
                     accounts: risk_check.to_account_metas(None),
@@ -948,7 +1008,6 @@ impl JupiterIx {
     }
 }
 
-
 pub fn take_accounts_into_metas<'info>(
     accounts: &mut &[AccountInfo<'info>],
     count: usize,
@@ -964,7 +1023,7 @@ pub fn take_accounts_into_metas<'info>(
         // mutate the slice
         *accounts = &accounts[1..];
     }
-   account_metas
+    account_metas
 }
 
 #[cfg(test)]

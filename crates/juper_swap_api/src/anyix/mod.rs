@@ -105,6 +105,7 @@ pub fn replace_by_account_pubkey(
 mod test {
     use super::*;
     use crate::anyix::test::solana_program::message::SanitizedMessage;
+    use crate::api::API;
     use crate::slippage::Slippage;
     use anchor_lang::solana_program;
     use simplelog::*;
@@ -131,7 +132,7 @@ mod test {
     }
     #[test]
     #[allow(unused_must_use)]
-    fn test_anyix_whirlpool_swap() {
+    fn test_anyix_whirlpool_swap_v6() {
         TermLogger::init(
             LevelFilter::Debug,
             ConfigBuilder::new()
@@ -171,6 +172,7 @@ mod test {
             &replacements,
             Slippage::TwentyBip,
             false,
+            API::V6,
         );
     }
     #[test]
@@ -276,7 +278,7 @@ mod test {
     }
     #[test]
     #[allow(unused_must_use)]
-    fn test_new_anyix_swap() {
+    fn test_new_anyix_swap_v6() {
         TermLogger::init(
             LevelFilter::Debug,
             ConfigBuilder::new()
@@ -330,6 +332,7 @@ mod test {
             &replacements,
             Slippage::TwentyBip,
             false,
+            API::V6,
         );
 
         super::swap::new_anyix_swap(
@@ -348,6 +351,7 @@ mod test {
             &Default::default(),
             Slippage::TwentyBip,
             false,
+            API::V6,
         );
         std::thread::sleep(std::time::Duration::from_secs(1));
         super::swap::new_anyix_swap(
@@ -366,6 +370,7 @@ mod test {
             &Default::default(),
             Slippage::TwentyBip,
             false,
+            API::V6,
         );
         std::thread::sleep(std::time::Duration::from_secs(1));
         super::swap::new_anyix_swap(
@@ -384,6 +389,7 @@ mod test {
             &Default::default(),
             Slippage::TwentyBip,
             true,
+            API::V6,
         );
     }
 }

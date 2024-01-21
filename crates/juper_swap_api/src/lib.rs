@@ -1,5 +1,6 @@
 use crate::api::JupAPI;
 
+use api::API;
 use solana_sdk::{pubkey::Pubkey, transaction::Transaction};
 
 //pub mod core;
@@ -33,16 +34,22 @@ impl Client {
         route: Quote,
         user_public_key: Pubkey,
         swap_config: SwapConfig,
+        version: API,
     ) -> anyhow::Result<Swap> {
-        crate::api::API::V1.swap(route, user_public_key, swap_config)
+        version.swap(route, user_public_key, swap_config)
     }
     /// Get swap serialized transactions for a quote using `SwapConfig` defaults
-    pub fn swap(&self, route: Quote, user_public_key: Pubkey) -> anyhow::Result<Swap> {
-        self.swap_with_config(route, user_public_key, SwapConfig::default())
+    pub fn swap(
+        &self,
+        route: Quote,
+        user_public_key: Pubkey,
+        version: API,
+    ) -> anyhow::Result<Swap> {
+        self.swap_with_config(route, user_public_key, SwapConfig::default(), version)
     }
     /// Returns a hash map, input mint as key and an array of valid output mint as values
-    pub fn route_map(&self, only_direct_routes: bool) -> anyhow::Result<RouteMap> {
-        crate::api::API::V1.route_map(only_direct_routes)
+    pub fn route_map(&self, only_direct_routes: bool, version: API) -> anyhow::Result<RouteMap> {
+        version.route_map(only_direct_routes)
     }
     /// Get quote for a given input mint, output mint and amount
     pub fn quote(
@@ -53,8 +60,9 @@ impl Client {
         only_direct_routes: bool,
         slippage: crate::slippage::Slippage,
         fees_bps: crate::slippage::FeeBps,
+        version: API,
     ) -> anyhow::Result<Response<Vec<Quote>>> {
-        crate::api::API::V1.quote(
+        version.quote(
             input_mint,
             output_mint,
             amount,
@@ -69,13 +77,9 @@ impl Client {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-        v6: bool,
+        version: API,
     ) -> anyhow::Result<Vec<Price>> {
-        if v6 {
-            crate::api::API::V6.price(input_mints, output_mint, ui_amount)
-        } else {
-            crate::api::API::V1.price(input_mints, output_mint, ui_amount)
-        }
+        version.price(input_mints, output_mint, ui_amount)
     }
     pub fn batch_price_lookup(
         &self,
@@ -83,30 +87,17 @@ impl Client {
         output_mint: Pubkey,
         ui_amount: Option<f64>,
         v6: bool,
+        version: API,
     ) -> anyhow::Result<Vec<Price>> {
         let input_len = input_mints.len();
         if input_len <= 10 {
-            if v6 {
-                return crate::api::API::V6.price(input_mints, output_mint, ui_amount);
-            } else {
-                return crate::api::API::V1.price(input_mints, output_mint, ui_amount);
-            }
+            return version.price(input_mints, output_mint, ui_amount);
         } else {
             let chunks = input_mints.chunks(10);
             let mut prices = Vec::with_capacity(input_len);
             chunks.into_iter().for_each(|chunk| {
-                if v6 {
-                    if let Ok(price_infos) =
-                        crate::api::API::V6.price(chunk, output_mint, ui_amount)
-                    {
-                        prices.extend_from_slice(&price_infos[..]);
-                    }
-                } else {
-                    if let Ok(price_infos) =
-                        crate::api::API::V1.price(chunk, output_mint, ui_amount)
-                    {
-                        prices.extend_from_slice(&price_infos[..]);
-                    }
+                if let Ok(price_infos) = version.price(chunk, output_mint, ui_amount) {
+                    prices.extend_from_slice(&price_infos[..]);
                 }
             });
             Ok(prices)
@@ -117,37 +108,19 @@ impl Client {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-        v6: bool,
+        version: API,
     ) -> anyhow::Result<Vec<Price>> {
         let input_len = input_mints.len();
         if input_len <= 10 {
-            if v6 {
-                return Ok(crate::api::API::V6
-                    .async_price(input_mints, output_mint, ui_amount)
-                    .await?);
-            } else {
-                return Ok(crate::api::API::V1
-                    .async_price(input_mints, output_mint, ui_amount)
-                    .await?);
-            }
+            return Ok(version
+                .async_price(input_mints, output_mint, ui_amount)
+                .await?);
         } else {
             let chunks = input_mints.chunks(10);
             let mut prices = Vec::with_capacity(input_len);
             for chunk in chunks {
-                if v6 {
-                    if let Ok(price_infos) = crate::api::API::V6
-                        .async_price(chunk, output_mint, ui_amount)
-                        .await
-                    {
-                        prices.extend_from_slice(&price_infos[..]);
-                    }
-                } else {
-                    if let Ok(price_infos) = crate::api::API::V1
-                        .async_price(chunk, output_mint, ui_amount)
-                        .await
-                    {
-                        prices.extend_from_slice(&price_infos[..]);
-                    }
+                if let Ok(price_infos) = version.async_price(chunk, output_mint, ui_amount).await {
+                    prices.extend_from_slice(&price_infos[..]);
                 }
             }
             Ok(prices)
@@ -165,24 +138,63 @@ impl AsyncClient {
         route: Quote,
         user_public_key: Pubkey,
         swap_config: SwapConfig,
+        version: API,
     ) -> anyhow::Result<Swap> {
-        crate::api::API::V1
-            .async_swap(route, user_public_key, swap_config)
-            .await
+        match version {
+            API::V6 => {
+                crate::api::API::V6
+                    .async_swap(route, user_public_key, swap_config)
+                    .await
+            }
+            API::V4 => {
+                crate::api::API::V4
+                    .async_swap(route, user_public_key, swap_config)
+                    .await
+            }
+            _ => {
+                crate::api::API::V1
+                    .async_swap(route, user_public_key, swap_config)
+                    .await
+            }
+        }
     }
     /// Get swap serialized transactions for a quote using `SwapConfig` defaults
-    pub async fn swap(&self, route: Quote, user_public_key: Pubkey) -> anyhow::Result<Swap> {
+    pub async fn swap(
+        &self,
+        route: Quote,
+        user_public_key: Pubkey,
+        version: API,
+    ) -> anyhow::Result<Swap> {
         let conf = SwapConfig {
             wrap_unwrap_sol: Some(false),
             ..Default::default()
         };
-        self.swap_with_config(route, user_public_key, conf).await
+        self.swap_with_config(route, user_public_key, conf, version)
+            .await
     }
     /// Returns a hash map, input mint as key and an array of valid output mint as values
-    pub async fn route_map(&self, only_direct_routes: bool) -> anyhow::Result<RouteMap> {
-        crate::api::API::V1
-            .async_route_map(only_direct_routes)
-            .await
+    pub async fn route_map(
+        &self,
+        only_direct_routes: bool,
+        version: API,
+    ) -> anyhow::Result<RouteMap> {
+        match version {
+            API::V6 => {
+                crate::api::API::V6
+                    .async_route_map(only_direct_routes)
+                    .await
+            }
+            API::V4 => {
+                crate::api::API::V4
+                    .async_route_map(only_direct_routes)
+                    .await
+            }
+            _ => {
+                crate::api::API::V1
+                    .async_route_map(only_direct_routes)
+                    .await
+            }
+        }
     }
     /// Get quote for a given input mint, output mint and amount
     pub async fn quote(
@@ -193,17 +205,46 @@ impl AsyncClient {
         only_direct_routes: bool,
         slippage: crate::slippage::Slippage,
         fees_bps: crate::slippage::FeeBps,
+        version: API,
     ) -> anyhow::Result<Response<Vec<Quote>>> {
-        crate::api::API::V1
-            .async_quote(
-                input_mint,
-                output_mint,
-                amount,
-                only_direct_routes,
-                slippage,
-                fees_bps,
-            )
-            .await
+        match version {
+            API::V6 => {
+                crate::api::API::V6
+                    .async_quote(
+                        input_mint,
+                        output_mint,
+                        amount,
+                        only_direct_routes,
+                        slippage,
+                        fees_bps,
+                    )
+                    .await
+            }
+            API::V4 => {
+                crate::api::API::V4
+                    .async_quote(
+                        input_mint,
+                        output_mint,
+                        amount,
+                        only_direct_routes,
+                        slippage,
+                        fees_bps,
+                    )
+                    .await
+            }
+            _ => {
+                crate::api::API::V1
+                    .async_quote(
+                        input_mint,
+                        output_mint,
+                        amount,
+                        only_direct_routes,
+                        slippage,
+                        fees_bps,
+                    )
+                    .await
+            }
+        }
     }
     /// Get simple price for a given input mint, output mint and amount
     pub async fn price(
@@ -211,16 +252,24 @@ impl AsyncClient {
         input_mints: &[Pubkey],
         output_mint: Pubkey,
         ui_amount: Option<f64>,
-        v6: bool,
+        version: API,
     ) -> anyhow::Result<Vec<Price>> {
-        if v6 {
-            crate::api::API::V6
-                .async_price(input_mints, output_mint, ui_amount)
-                .await
-        } else {
-            crate::api::API::V1
-                .async_price(input_mints, output_mint, ui_amount)
-                .await
+        match version {
+            API::V6 => {
+                crate::api::API::V6
+                    .async_price(input_mints, output_mint, ui_amount)
+                    .await
+            }
+            API::V4 => {
+                crate::api::API::V4
+                    .async_price(input_mints, output_mint, ui_amount)
+                    .await
+            }
+            _ => {
+                crate::api::API::V1
+                    .async_price(input_mints, output_mint, ui_amount)
+                    .await
+            }
         }
     }
 }
@@ -244,7 +293,7 @@ mod test {
     use super::JupAPI;
     use super::*;
     #[test]
-    fn test_jupapi_v1() {
+    fn test_jupapi_v6() {
         let prices = Client::new()
             .price(
                 &[
@@ -253,7 +302,7 @@ mod test {
                 ],
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
                 None,
-                true,
+                API::V6,
             )
             .unwrap();
         assert!(prices.len() == 2);
@@ -267,8 +316,130 @@ mod test {
                 ],
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
                 None,
-                true,
+                API::V6,
             )
+            .unwrap();
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+    }
+    #[test]
+    fn test_jupapi_v4() {
+        let prices = Client::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                API::V4,
+            )
+            .unwrap();
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+
+        let prices = Client::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                API::V4,
+            )
+            .unwrap();
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+    }
+    #[test]
+    fn test_jupapi_v1() {
+        let prices = Client::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                API::V1,
+            )
+            .unwrap();
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+
+        let prices = Client::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                API::V1,
+            )
+            .unwrap();
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+    }
+    #[tokio::test]
+    async fn test_jupapi_v6_async() {
+        let prices = AsyncClient::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                API::V6,
+            )
+            .await
+            .expect("failed to query price");
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+        let prices = AsyncClient::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                API::V6,
+            )
+            .await
+            .unwrap();
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+    }
+    #[tokio::test]
+    async fn test_jupapi_v4_async() {
+        let prices = AsyncClient::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                API::V4,
+            )
+            .await
+            .expect("failed to query price");
+        assert!(prices.len() == 2);
+        println!("{:#?}", prices);
+        let prices = AsyncClient::new()
+            .price(
+                &[
+                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
+                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                ],
+                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
+                None,
+                API::V4,
+            )
+            .await
             .unwrap();
         assert!(prices.len() == 2);
         println!("{:#?}", prices);
@@ -283,7 +454,7 @@ mod test {
                 ],
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
                 None,
-                true,
+                API::V1,
             )
             .await
             .expect("failed to query price");
@@ -297,7 +468,7 @@ mod test {
                 ],
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
                 None,
-                true,
+                API::V1,
             )
             .await
             .unwrap();

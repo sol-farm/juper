@@ -4,6 +4,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 
 use crate::{
+    api::API,
     quoter::Quoter,
     slippage::{FeeBps, Slippage},
     types::Quote,
@@ -59,6 +60,7 @@ impl RouteCache {
         tokens: &[(Pubkey /*input */, Pubkey /*output */)],
         slippage: Slippage,
         ui_amount: f64,
+        version: API,
     ) -> anyhow::Result<()> {
         for (input, output) in tokens.iter() {
             let quoter = if let Some(quoter) = self.quoters.read().unwrap().get(&(*input, *output))
@@ -68,7 +70,7 @@ impl RouteCache {
                 Quoter::new(rpc, *input, *output)?
             };
             let routes = quoter
-                .lookup_routes(ui_amount, false, slippage, FeeBps::Zero)
+                .lookup_routes(ui_amount, false, slippage, FeeBps::Zero, version)
                 .await?;
             match self.routes.write() {
                 Ok(mut entry_lock) => {

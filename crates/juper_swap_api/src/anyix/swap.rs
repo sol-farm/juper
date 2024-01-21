@@ -1,5 +1,6 @@
 //! provides functions to create AnyIx jupiter swaps using the swap api
 use crate::{
+    api::API,
     slippage::{FeeBps, Slippage},
     types::{Quote, SwapConfig},
     utils::decompile_transaction_instructions,
@@ -59,6 +60,7 @@ pub fn new_anyix_swap_ix_with_quote(
     fail_on_setup: bool,
     input_mint: Pubkey,
     output_mint: Pubkey,
+    version: API,
 ) -> Result<JupiterAnyIxSwap> {
     let jup_client = crate::Client::new();
     let swap_config = jup_client.swap_with_config(
@@ -68,6 +70,7 @@ pub fn new_anyix_swap_ix_with_quote(
             wrap_unwrap_sol: Some(false),
             ..Default::default()
         },
+        version,
     )?;
 
     let crate::types::Swap {
@@ -138,6 +141,7 @@ pub fn new_anyix_swap_with_quote(
     fail_on_setup: bool,
     input_mint: Pubkey,
     output_mint: Pubkey,
+    version: API,
 ) -> Result<Signature> {
     let jup_any_ix = new_anyix_swap_ix_with_quote(
         swap_route,
@@ -151,6 +155,7 @@ pub fn new_anyix_swap_with_quote(
         fail_on_setup,
         input_mint,
         output_mint,
+        version,
     )?;
     let jup_swap_ix = if let Some(swap_ix) = jup_any_ix.swap {
         swap_ix
@@ -232,6 +237,7 @@ pub fn new_anyix_swap(
     replacements: &HashMap<Pubkey, Pubkey>,
     slippage: Slippage,
     fail_on_setup: bool,
+    version: API,
 ) -> Result<Signature> {
     let market_blacklist: RegexSet = if let Some(list) = disallowed_market_list {
         list
@@ -240,7 +246,7 @@ pub fn new_anyix_swap(
     };
     let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
     let routes = quoter
-        .lookup_routes2(input_amount, false, slippage, FeeBps::Zero)?
+        .lookup_routes2(input_amount, false, slippage, FeeBps::Zero, version)?
         .into_iter()
         .filter(|quote| {
             for market_info in quote.market_infos.iter() {
@@ -274,6 +280,7 @@ pub fn new_anyix_swap(
                 fail_on_setup,
                 input_mint,
                 output_mint,
+                version,
             )
         };
         log::debug!(
@@ -386,7 +393,11 @@ pub fn process_transaction(
         })
         .collect::<Vec<_>>();
     if expected_instructions.ne(&any_ix_args.len()) {
-        return Err(anyhow!("unexpected instruction count. got {}, want {}", any_ix_args.len(), expected_instructions));
+        return Err(anyhow!(
+            "unexpected instruction count. got {}, want {}",
+            any_ix_args.len(),
+            expected_instructions
+        ));
     }
     let mut accounts = juper_swap_cpi::accounts::JupiterSwap {
         vault,
