@@ -25,6 +25,8 @@ use anchor_lang::{prelude::*, InstructionData};
 use solana_program::{instruction::Instruction, program_pack::Pack};
 use std::collections::BTreeMap;
 
+use crate::instructions::v6_ixs::V6Instructions;
+
 /// The reference implementation of the AnyIx instruction parser for use with
 /// the juper_swap_cpi crate. It performs basic access controls, ensuring
 /// the provided jupiter progrma account is the V3 aggregator, and that all
@@ -42,9 +44,8 @@ pub fn process_instructions<'info>(
 ) -> Result<()> {
     // ensure an acceptable programId is being used
     assert!(JUPITER_AGG_IDS.contains(jupiter_program_account.key));
-
     if jupiter_program_account.key.eq(&JUPITER_V6_AGG_ID) {
-        return process_v6_swap(&remaining_accounts, jupiter_program_account, data, seeds);
+        return process_v6_swap(&remaining_accounts, jupiter_program_account, Default::default(), Default::default(), Default::default(), data, seeds);
     }
 
     let any_ix = anyix::AnyIx::unpack(data)?;
@@ -96,17 +97,28 @@ pub fn decode_jupiter_instruction(input: &[u8]) -> Result<(JupiterIx, SwapInputs
     }
 }
 
+//
+pub struct V6SwapVerificationOpts {
+    pub wanted_transfer_authority: Pubkey,
+    pub wanted_user_source_token_account_owner: Pubkey,
+    pub wanted_user_destination_token_account_owner: Pubkey,
+}
+
 pub fn process_v6_swap<'info>(
     remaining_accounts: &[AccountInfo],
     jupiter_program: &AccountInfo<'info>,
+    wanted_transfer_authority: Pubkey,
+    want_user_source_token_account_owner: Pubkey,
+    wanted_user_destination_token_account_owner: Pubkey,
     data: &[u8],
     seeds: Option<&[&[&[u8]]]>,
 ) -> Result<()> {
     // ensure we are only swapping against the v6 program id
     assert!(jupiter_program.key.eq(&JUPITER_V6_AGG_ID));
-    // validate the instruction sighash
-    assert!(instructions::v6_ixs::V6_AGG_SIGHASHES.contains(&data[0..8].try_into().unwrap()));
-
+    // verify the instruction sighash is a genuine one and expected
+    let ix = V6Instructions::try_from(&data[0..8].try_into().unwrap()).unwrap();
+    // validate the input accounts, notably signer, source+destination user token account owners
+    ix.validate_accounts(remaining_accounts, wanted_transfer_authority, want_user_source_token_account_owner, wanted_user_destination_token_account_owner);
     let accounts: Vec<AccountMeta> = remaining_accounts
         .iter()
         .map(|acc| AccountMeta {
