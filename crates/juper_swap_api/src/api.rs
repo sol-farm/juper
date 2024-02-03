@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 
 use crate::{
@@ -178,7 +179,7 @@ impl JupAPI for API {
         slippage: Slippage,
         fees_bps: FeeBps,
     ) -> String {
-        match self {
+        let quote = match self {
             Self::V6 => {
                 format!(
                     "https://quote-api.jup.ag/v6/quote?inputMint={}&outputMint={}&amount={}&onlyDirectRoutes={}&{}{}",
@@ -201,7 +202,9 @@ impl JupAPI for API {
                     fees_bps.value(),
                 )
             }
-        }
+        };
+        log::info!("quote_str{quote}");
+        quote
     }
 
     fn price_str(
@@ -306,7 +309,13 @@ impl JupAPI for API {
             slippage,
             fees_bps,
         );
-        maybe_jupiter_api_error(self.client().get(url).send()?.json()?)
+        let response = self.client().get(url).send()?;
+        let response_str = response.text()?;
+        if let Ok(res) = serde_json::from_str(&response_str) {
+            Ok(res)
+        } else {
+            Err(anyhow!("failed to deserialize response {}", response_str))
+        }
     }
     async fn async_quote(
         &self,
