@@ -146,16 +146,6 @@ impl AsyncClient {
                     .async_swap(route, user_public_key, swap_config)
                     .await
             }
-            API::V4 => {
-                crate::api::API::V4
-                    .async_swap(route, user_public_key, swap_config)
-                    .await
-            }
-            _ => {
-                crate::api::API::V1
-                    .async_swap(route, user_public_key, swap_config)
-                    .await
-            }
         }
     }
     /// Get swap serialized transactions for a quote using `SwapConfig` defaults
@@ -181,16 +171,6 @@ impl AsyncClient {
         match version {
             API::V6 => {
                 crate::api::API::V6
-                    .async_route_map(only_direct_routes)
-                    .await
-            }
-            API::V4 => {
-                crate::api::API::V4
-                    .async_route_map(only_direct_routes)
-                    .await
-            }
-            _ => {
-                crate::api::API::V1
                     .async_route_map(only_direct_routes)
                     .await
             }
@@ -220,30 +200,6 @@ impl AsyncClient {
                     )
                     .await
             }
-            API::V4 => {
-                crate::api::API::V4
-                    .async_quote(
-                        input_mint,
-                        output_mint,
-                        amount,
-                        only_direct_routes,
-                        slippage,
-                        fees_bps,
-                    )
-                    .await
-            }
-            _ => {
-                crate::api::API::V1
-                    .async_quote(
-                        input_mint,
-                        output_mint,
-                        amount,
-                        only_direct_routes,
-                        slippage,
-                        fees_bps,
-                    )
-                    .await
-            }
         }
     }
     /// Get simple price for a given input mint, output mint and amount
@@ -257,16 +213,6 @@ impl AsyncClient {
         match version {
             API::V6 => {
                 crate::api::API::V6
-                    .async_price(input_mints, output_mint, ui_amount)
-                    .await
-            }
-            API::V4 => {
-                crate::api::API::V4
-                    .async_price(input_mints, output_mint, ui_amount)
-                    .await
-            }
-            _ => {
-                crate::api::API::V1
                     .async_price(input_mints, output_mint, ui_amount)
                     .await
             }
@@ -322,66 +268,6 @@ mod test {
         assert!(prices.len() == 2);
         println!("{:#?}", prices);
     }
-    #[test]
-    fn test_jupapi_v4() {
-        let prices = Client::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V4,
-            )
-            .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-
-        let prices = Client::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V4,
-            )
-            .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-    }
-    #[test]
-    fn test_jupapi_v1() {
-        let prices = Client::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V1,
-            )
-            .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-
-        let prices = Client::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V1,
-            )
-            .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-    }
     #[tokio::test]
     async fn test_jupapi_v6_async() {
         let prices = AsyncClient::new()
@@ -407,68 +293,6 @@ mod test {
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
                 None,
                 API::V6,
-            )
-            .await
-            .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-    }
-    #[tokio::test]
-    async fn test_jupapi_v4_async() {
-        let prices = AsyncClient::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V4,
-            )
-            .await
-            .expect("failed to query price");
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-        let prices = AsyncClient::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V4,
-            )
-            .await
-            .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-    }
-    #[tokio::test]
-    async fn test_jupapi_v1_async() {
-        let prices = AsyncClient::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V1,
-            )
-            .await
-            .expect("failed to query price");
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-        let prices = AsyncClient::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V1,
             )
             .await
             .unwrap();

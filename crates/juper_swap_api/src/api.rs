@@ -24,8 +24,6 @@ pub static ASYNC_REQ_CLIENT: Lazy<reqwest::Client> =
 /// The API type provides variants which implements the JupAPI trait
 /// for the corresponding api version as indicated by the variant
 pub enum API {
-    V1,
-    V4,
     V6,
 }
 
@@ -218,21 +216,9 @@ impl JupAPI for API {
         let formatted = formatted.replace(']', "");
         let formatted = formatted.replace(" ", "");
         match self {
-            Self::V6 | Self::V4 => {
-                format!(
-                    "https://price.jup.ag/v4/price?ids={}&vsToken={}{}",
-                    formatted,
-                    output_mint,
-                    if let Some(ui_amount) = ui_amount {
-                        format!("&amount={}", ui_amount)
-                    } else {
-                        "".to_string()
-                    },
-                )
-            }
             _ => {
                 format!(
-                    "https://quote-api.jup.ag/v1/price?id={}&vsToken={}{}",
+                    "https://price.jup.ag/v4/price?ids={}&vsToken={}{}",
                     formatted,
                     output_mint,
                     if let Some(ui_amount) = ui_amount {
@@ -345,15 +331,9 @@ impl JupAPI for API {
         ui_amount: Option<f64>,
     ) -> anyhow::Result<Vec<Price>> {
         let url = self.price_str(input_mints, output_mint, ui_amount);
-        if self.eq(&Self::V6) || self.eq(&Self::V4) {
-            let res: crate::Response<HashMap<String, Price>> =
-                maybe_jupiter_api_error(self.client().get(url).send()?.json()?)?;
-            Ok(res.data.into_values().collect::<Vec<_>>())
-        } else {
-            let res: crate::Response<Vec<Price>> =
-                maybe_jupiter_api_error(self.client().get(url).send()?.json()?)?;
-            Ok(res.data)
-        }
+        let res: crate::Response<HashMap<String, Price>> =
+        maybe_jupiter_api_error(self.client().get(url).send()?.json()?)?;
+        Ok(res.data.into_values().collect::<Vec<_>>())
     }
     async fn async_price(
         &self,
@@ -362,15 +342,9 @@ impl JupAPI for API {
         ui_amount: Option<f64>,
     ) -> anyhow::Result<Vec<Price>> {
         let url = self.price_str(input_mints, output_mint, ui_amount);
-        if self.eq(&Self::V6) || self.eq(&Self::V4) {
-            let res: crate::Response<HashMap<String, Price>> =
-                maybe_jupiter_api_error(self.async_client().get(url).send().await?.json().await?)?;
-            Ok(res.data.into_values().collect::<Vec<_>>())
-        } else {
-            let res: crate::Response<Vec<Price>> =
-                maybe_jupiter_api_error(self.async_client().get(url).send().await?.json().await?)?;
-            Ok(res.data)
-        }
+        let res: crate::Response<HashMap<String, Price>> =
+        maybe_jupiter_api_error(self.async_client().get(url).send().await?.json().await?)?;
+        Ok(res.data.into_values().collect::<Vec<_>>())
     }
 }
 
@@ -438,35 +412,14 @@ mod test {
             got,
             "https://quote-api.jup.ag/v6/indexed-route-map?onlyDirectRoutes=true"
         );
-        let got = API::V1.route_map_str(true);
-        assert_eq!(
-            got,
-            "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=true"
-        );
         let got = API::V6.route_map_str(false);
         assert_eq!(
             got,
             "https://quote-api.jup.ag/v6/indexed-route-map?onlyDirectRoutes=false"
         );
-        let got = API::V1.route_map_str(false);
-        assert_eq!(
-            got,
-            "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=false"
-        );
         let got = API::V6.swap_str();
         assert_eq!(got, "https://quote-api.jup.ag/v6/swap");
-        let got = API::V1.swap_str();
-        assert_eq!(got, "https://quote-api.jup.ag/v1/swap");
         let price = API::V6.price_str(
-            &[
-                Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-            ],
-            Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-            None,
-        );
-        assert_eq!(price, "https://price.jup.ag/v4/price?ids=So11111111111111111111111111111111111111112,EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&vsToken=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-        let price = API::V4.price_str(
             &[
                 Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
                 Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
