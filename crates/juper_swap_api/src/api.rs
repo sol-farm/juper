@@ -147,11 +147,11 @@ impl JupAPI for API {
             _ => {
                 if direct {
                     const DIRECT: &str =
-                        "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=true";
+                        "https://quote-api.jup.ag/v6/indexed-route-map?onlyDirectRoutes=true";
                     DIRECT
                 } else {
                     const NOT_DIRECT: &str =
-                        "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=false";
+                        "https://quote-api.jup.ag/v6/indexed-route-map?onlyDirectRoutes=false";
                     NOT_DIRECT
                 }
             }
@@ -165,7 +165,7 @@ impl JupAPI for API {
                 SWAP
             }
             _ => {
-                const SWAP: &str = "https://quote-api.jup.ag/v1/swap";
+                const SWAP: &str = "https://quote-api.jup.ag/v6/swap";
                 SWAP
             }
         }
@@ -180,7 +180,7 @@ impl JupAPI for API {
         fees_bps: FeeBps,
     ) -> String {
         let quote = match self {
-            Self::V6 => {
+            _ => {
                 format!(
                     "https://quote-api.jup.ag/v6/quote?inputMint={}&outputMint={}&amount={}&onlyDirectRoutes={}&{}{}",
                     input_mint,
@@ -191,7 +191,7 @@ impl JupAPI for API {
                     fees_bps.value(),
                 )
             }
-            _ => {
+            /*_ => {
                 format!(
                     "https://quote-api.jup.ag/v1/quote?inputMint={}&outputMint={}&amount={}&onlyDirectRoutes={}&{}{}",
                     input_mint,
@@ -201,7 +201,7 @@ impl JupAPI for API {
                     slippage.value(),
                     fees_bps.value(),
                 )
-            }
+            }*/
         };
         log::info!("quote_str{quote}");
         quote
