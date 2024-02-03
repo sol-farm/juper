@@ -78,15 +78,10 @@ impl RouteCache {
                         let counter_prev = cache_entry.counter;
                         cache_entry.counter += 1;
                         cache_entry.quotes.clear();
-                        cache_entry.quotes.append(
-                            &mut routes
-                                .into_iter()
-                                .map(|quote| WrappedQuote {
-                                    quote,
-                                    stale: false,
-                                })
-                                .collect::<Vec<_>>(),
-                        );
+                        cache_entry.quotes.push(WrappedQuote {
+                            quote: routes,
+                            stale: false
+                        });
                         log::info!(
                             "route_cache_update(old_counter={}, new_counter={})",
                             counter_prev,
@@ -97,13 +92,10 @@ impl RouteCache {
                             (*input, *output),
                             RouteCacheEntry {
                                 counter: 0,
-                                quotes: routes
-                                    .into_iter()
-                                    .map(|quote| WrappedQuote {
-                                        quote,
-                                        stale: false,
-                                    })
-                                    .collect::<Vec<_>>(),
+                                quotes: vec![WrappedQuote {
+                                    quote: routes,
+                                    stale: false
+                                }],
                             },
                         );
                     }

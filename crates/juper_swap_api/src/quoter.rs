@@ -61,7 +61,7 @@ impl Quoter {
         slippage: Slippage,
         fees_bps: FeeBps,
         version: API,
-    ) -> anyhow::Result<Vec<Quote>> {
+    ) -> anyhow::Result<Quote> {
         let mut quotes = crate::AsyncClient
             .quote(
                 self.input_mint,
@@ -82,7 +82,7 @@ impl Quoter {
         slippage: Slippage,
         fees_bps: FeeBps,
         version: API,
-    ) -> anyhow::Result<Vec<Quote>> {
+    ) -> anyhow::Result<Quote> {
         let mut quotes = match crate::Client.quote(
             self.input_mint,
             self.output_mint,

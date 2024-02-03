@@ -239,45 +239,29 @@ pub fn new_anyix_swap(
     fail_on_setup: bool,
     version: API,
 ) -> Result<Signature> {
-    let market_blacklist: RegexSet = if let Some(list) = disallowed_market_list {
-        list
-    } else {
-        MARKET_BLACKLIST.clone()
-    };
     let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
-    let routes = quoter
+    let route = quoter
         .lookup_routes2(input_amount, false, slippage, FeeBps::Zero, version)?;
-    if routes.is_empty() {
-        let error_msg = "failed to find any routes";
-        log::debug!("{}", error_msg);
-        return Err(anyhow!("{}", error_msg));
-    }
-    for (idx, route) in routes.into_iter().take(max_tries).enumerate() {
-        let swap_fn = |swap_route: Quote| -> Result<Signature> {
-            new_anyix_swap_with_quote(
-                swap_route,
-                rpc,
-                payer,
-                anyix_program,
-                management,
-                vault,
-                vault_pda,
-                skip_preflight,
-                replacements,
-                fail_on_setup,
-                input_mint,
-                output_mint,
-                version,
-            )
-        };
-        match swap_fn(route.clone()) {
-            Ok(sig) => return Ok(sig),
-            Err(err) => {
-                log::error!("anyix swap failed {:#?}", err);
-            }
+    match new_anyix_swap_with_quote(
+        route,
+        rpc,
+        payer,
+        anyix_program,
+        management,
+        vault,
+        vault_pda,
+        skip_preflight,
+        replacements,
+        fail_on_setup,
+        input_mint,
+        output_mint,
+        version,
+    ) {
+        Ok(sig) => return Ok(sig),
+        Err(err) => {
+            return Err(anyhow!("anyix swap failed {:#?}", err));
         }
     }
-    Err(anyhow!("failed to process jupiter swap"))
 }
 
 /// Processes a decoded transaction returned from jupiter's swap api. This

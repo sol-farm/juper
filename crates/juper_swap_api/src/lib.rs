@@ -61,7 +61,7 @@ impl Client {
         slippage: crate::slippage::Slippage,
         fees_bps: crate::slippage::FeeBps,
         version: API,
-    ) -> anyhow::Result<Response<Vec<Quote>>> {
+    ) -> anyhow::Result<Response<Quote>> {
         version.quote(
             input_mint,
             output_mint,
@@ -186,7 +186,7 @@ impl AsyncClient {
         slippage: crate::slippage::Slippage,
         fees_bps: crate::slippage::FeeBps,
         version: API,
-    ) -> anyhow::Result<Response<Vec<Quote>>> {
+    ) -> anyhow::Result<Response<Quote>> {
         match version {
             API::V6 => {
                 crate::api::API::V6

@@ -81,7 +81,7 @@ pub trait JupAPI {
         only_direct_routes: bool,
         slippage: Slippage,
         fee_bps: FeeBps,
-    ) -> anyhow::Result<Response<Vec<Quote>>>;
+    ) -> anyhow::Result<Response<Quote>>;
     /// submit a non-blocking quote request
     async fn async_quote(
         &self,
@@ -91,7 +91,7 @@ pub trait JupAPI {
         only_direct_routes: bool,
         slippage: Slippage,
         fee_bps: FeeBps,
-    ) -> anyhow::Result<Response<Vec<Quote>>>;
+    ) -> anyhow::Result<Response<Quote>>;
     /// submit a blocking swap request
     fn swap(
         &self,
@@ -286,7 +286,7 @@ impl JupAPI for API {
         only_direct_routes: bool,
         slippage: Slippage,
         fees_bps: FeeBps,
-    ) -> anyhow::Result<Response<Vec<Quote>>> {
+    ) -> anyhow::Result<Response<Quote>> {
         let url = self.quote_str(
             input_mint,
             output_mint,
@@ -311,7 +311,7 @@ impl JupAPI for API {
         only_direct_routes: bool,
         slippage: Slippage,
         fees_bps: FeeBps,
-    ) -> anyhow::Result<Response<Vec<Quote>>> {
+    ) -> anyhow::Result<Response<Quote>> {
         let url = self.quote_str(
             input_mint,
             output_mint,
