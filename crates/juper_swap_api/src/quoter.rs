@@ -73,21 +73,6 @@ impl Quoter {
                 version,
             )
             .await?;
-        quotes.data.sort_unstable_by(cmp_quote);
-
-        if !quotes.data.is_empty() {
-            let first_quote = &quotes.data[0];
-            let last_quote = &quotes.data[quotes.data.len() - 1];
-            log::debug!(
-                "first_quote(in={}, out={}, out_slip={}), last_quote(in={}, out={}, out_slip={})",
-                first_quote.in_amount,
-                first_quote.out_amount,
-                first_quote.out_amount_with_slippage,
-                last_quote.in_amount,
-                last_quote.out_amount,
-                last_quote.out_amount_with_slippage
-            )
-        }
         Ok(quotes.data)
     }
     pub fn lookup_routes2(
@@ -111,38 +96,6 @@ impl Quoter {
             Err(err) => return Err(anyhow!("failed to lookup quote {:#?}", err)),
         };
 
-        quotes.data.sort_unstable_by(cmp_quote);
-        if !quotes.data.is_empty() {
-            let first_quote = &quotes.data[0];
-            let last_quote = &quotes.data[quotes.data.len() - 1];
-            log::debug!(
-                "first_quote(in={}, out={}, out_slip={}), last_quote(in={}, out={}, out_slip={})",
-                first_quote.in_amount,
-                first_quote.out_amount,
-                first_quote.out_amount_with_slippage,
-                last_quote.in_amount,
-                last_quote.out_amount,
-                last_quote.out_amount_with_slippage
-            )
-        }
         Ok(quotes.data)
-    }
-}
-
-/// intended to reverse sort the quotes, such as that
-/// the first elements are greater in output amountr
-pub fn cmp_quote(a: &Quote, b: &Quote) -> Ordering {
-    if a.out_amount_with_slippage == 0 {
-        return Ordering::Greater;
-    }
-    if b.out_amount_with_slippage == 0 {
-        return Ordering::Greater;
-    }
-    if a.out_amount_with_slippage < b.out_amount_with_slippage {
-        Ordering::Greater
-    } else if a.out_amount_with_slippage > b.out_amount_with_slippage {
-        Ordering::Less
-    } else {
-        Ordering::Equal
     }
 }

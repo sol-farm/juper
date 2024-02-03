@@ -37,11 +37,40 @@ pub struct Price {
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
-    pub in_amount: u64,
-    pub out_amount: u64,
-    pub out_amount_with_slippage: u64,
-    pub price_impact_pct: Option<f64>,
-    pub market_infos: Vec<MarketInfo>,
+    pub input_mint: String,
+    pub in_amount: String,
+    pub output_mint: String,
+    pub out_amount: String,
+    pub other_amount_threshold: String,
+    pub swap_mode: String,
+    pub slippage_bps: i64,
+    pub platform_fee: serde_json::Value,
+    pub price_impact_pct: String,
+    pub route_plan: Vec<RoutePlan>,
+    pub context_slot: i64,
+    pub time_taken: f64,
+}
+
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutePlan {
+    pub swap_info: SwapInfo,
+    pub percent: i64,
+}
+
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwapInfo {
+    pub amm_key: String,
+    pub label: String,
+    pub input_mint: String,
+    pub output_mint: String,
+    pub in_amount: String,
+    pub out_amount: String,
+    pub fee_amount: String,
+    pub fee_mint: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -110,16 +139,4 @@ pub struct SwapConfig {
     pub wrap_unwrap_sol: Option<bool>,
     pub fee_account: Option<Pubkey>,
     pub token_ledger: Option<Pubkey>,
-}
-
-impl Quote {
-    pub fn formatted_market_infos(&self) -> String {
-        format!(
-            "market_infos={:?}",
-            self.market_infos
-                .iter()
-                .map(|m_info| &m_info.label)
-                .collect::<Vec<_>>()
-        )
-    }
 }

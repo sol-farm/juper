@@ -246,20 +246,7 @@ pub fn new_anyix_swap(
     };
     let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
     let routes = quoter
-        .lookup_routes2(input_amount, false, slippage, FeeBps::Zero, version)?
-        .into_iter()
-        .filter(|quote| {
-            for market_info in quote.market_infos.iter() {
-                if market_blacklist.is_match(&market_info.label) {
-                    log::debug!("ignoring market {}", market_info.label);
-                    return false;
-                } else {
-                    continue;
-                }
-            }
-            true
-        })
-        .collect::<Vec<_>>();
+        .lookup_routes2(input_amount, false, slippage, FeeBps::Zero, version)?;
     if routes.is_empty() {
         let error_msg = "failed to find any routes";
         log::debug!("{}", error_msg);
@@ -283,11 +270,6 @@ pub fn new_anyix_swap(
                 version,
             )
         };
-        log::debug!(
-            "processing route {}, markets {}",
-            idx,
-            route.formatted_market_infos()
-        );
         match swap_fn(route.clone()) {
             Ok(sig) => return Ok(sig),
             Err(err) => {
