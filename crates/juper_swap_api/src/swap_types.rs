@@ -106,6 +106,13 @@ impl SwapResponse {
             .filter_map(|ix| ix.to_instruction().ok())
             .collect();
         instructions.extend_from_slice(&setup_ixs);
+        // we need to make sure that any enabled signer addresses which are not the payer have the signer field reset
+        let mut swap_ix = self.swap_instruction.to_instruction()?;
+        swap_ix.accounts.iter_mut().for_each(|acct| {
+            if acct.is_signer && acct.pubkey != payer {
+                acct.is_signer = false;
+            }
+        });
         instructions.push(self.swap_instruction.to_instruction()?);
         // omit cleanup
         Ok(Transaction::new_with_payer(&instructions, Some(&payer)))
