@@ -100,25 +100,25 @@ impl SwapResponse {
         if let (Some(prio_fee), Some(cu_limit)) = (prio_fee, cu_limit) {
             instructions.push(ComputeBudgetInstruction::request_units(cu_limit, prio_fee as u32));
         } 
-        let mut setup_ixs: Vec<Instruction> = self
-            .setup_instructions
-            .iter()
-            .filter_map(|ix| ix.to_instruction().ok())
-            .collect();
-        setup_ixs.iter_mut().for_each(|ix| {
-            ix.accounts.iter_mut().for_each(|acct| {
-                if ix.program_id.eq(&spl_associated_token_account::id()) {
-                    // for ata instructions, replace the fee payer
-                    if acct.is_signer && acct.pubkey != payer {
-                        // 
-                        acct.pubkey = payer;
-                    }
-                }
-
-            })
-
-        });
-        instructions.extend_from_slice(&setup_ixs);
+        //let mut setup_ixs: Vec<Instruction> = self
+        //    .setup_instructions
+        //    .iter()
+        //    .filter_map(|ix| ix.to_instruction().ok())
+        //    .collect();
+        //setup_ixs.iter_mut().for_each(|ix| {
+        //    ix.accounts.iter_mut().for_each(|acct| {
+        //        if ix.program_id.eq(&spl_associated_token_account::id()) {
+        //            // for ata instructions, replace the fee payer
+        //            if acct.is_signer && acct.pubkey != payer {
+        //                // 
+        //                acct.pubkey = payer;
+        //            }
+        //        }
+//
+        //    })
+//
+        //});
+        //instructions.extend_from_slice(&setup_ixs);
         // we need to make sure that any enabled signer addresses which are not the payer have the signer field reset
         let mut swap_ix = self.swap_instruction.to_instruction()?;
         swap_ix.accounts.iter_mut().for_each(|acct| {
