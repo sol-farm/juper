@@ -6,6 +6,7 @@ use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::system_instruction;
+use solana_sdk::transaction::Transaction;
 use std::str::FromStr;
 use std::sync::Arc;
 pub const SWAP_BASE: &str = "https://quote-api.jup.ag/v6/swap-instructions";
@@ -89,7 +90,7 @@ impl SwapResponse {
         prio_fee: Option<u64>,
         cu_limit: Option<u32>,
         input_mint: Pubkey,
-    ) -> anyhow::Result<solana_sdk::message::Message> {
+    ) -> anyhow::Result<Transaction> {
         let num_instructions = usize::from(prio_fee.is_some())
             + usize::from(cu_limit.is_some())
             + self.setup_instructions.len()
@@ -107,9 +108,7 @@ impl SwapResponse {
         instructions.extend_from_slice(&setup_ixs);
         instructions.push(self.swap_instruction.to_instruction()?);
         // omit cleanup
-        let luts = self.address_lookup_tables();
-        let msg = solana_sdk::message::Message::new(&instructions, Some(&payer));
-        Ok(msg)
+        Ok(Transaction::new_with_payer(&instructions, Some(&payer)))
     }
 }
 

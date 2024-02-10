@@ -68,8 +68,8 @@ pub fn new_anyix_swap_ix_with_quote(
     if !swap_response.setup_instructions.is_empty() {
         jup_any_ix.setup = Some(swap_response.setup_instructions.iter().filter_map(|ix| ix.to_instruction().ok()).collect::<Vec<_>>())
     }
-    let swap_tx = swap_response.new_transaction(rpc, payer.pubkey(), None, None, input_mint)?;
-    let mut tx = Transaction::new(&[payer], swap_tx, rpc.get_latest_blockhash()?);
+    let mut tx = swap_response.new_transaction(rpc, payer.pubkey(), None, None, input_mint)?;
+    tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
     jup_any_ix.swap = match process_transaction(
         rpc,
         payer,
