@@ -122,6 +122,7 @@ pub fn new_anyix_swap_with_quote(
     input_mint: Pubkey,
     output_mint: Pubkey,
 ) -> Result<Signature> {
+    log::info!("generating jupiter swap ix");
     let jup_any_ix = new_anyix_swap_ix_with_quote(
         swap_route,
         rpc,
@@ -140,6 +141,7 @@ pub fn new_anyix_swap_with_quote(
     } else {
         return Err(anyhow!("failed to create jupiter any ix swap"));
     };
+    log::info!("constructing txn");
     let mut tx = Transaction::new_with_payer(&[jup_swap_ix], Some(&payer.pubkey()));
 
     #[cfg(test)]
@@ -151,7 +153,7 @@ pub fn new_anyix_swap_with_quote(
         )
         .unwrap()
     );
-
+    log::info!("signing txn");
     tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
     log::debug!("sending jupiter swap ix");
     if skip_preflight {
