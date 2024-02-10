@@ -72,7 +72,7 @@ pub fn new_anyix_swap_ix_with_quote(
     //}
     log::info!("creating txn");
     let mut tx = swap_response.new_transaction(rpc, payer.pubkey(), None, None, input_mint)?;
-    log::info!("signign txn");
+    log::info!("signign txn {tx:#?}");
     tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
     log::info!("processing txn");
     jup_any_ix.swap = match process_transaction(
