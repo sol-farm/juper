@@ -105,7 +105,6 @@ pub fn replace_by_account_pubkey(
 mod test {
     use super::*;
     use crate::anyix::test::solana_program::message::SanitizedMessage;
-    use crate::api::API;
     use crate::slippage::Slippage;
     use anchor_lang::solana_program;
     use simplelog::*;
@@ -129,51 +128,6 @@ mod test {
             &[b"tokenb_compound_queue", vault.as_ref(), mint.as_ref()],
             &static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD"),
         )
-    }
-    #[test]
-    #[allow(unused_must_use)]
-    fn test_anyix_whirlpool_swap_v6() {
-        TermLogger::init(
-            LevelFilter::Debug,
-            ConfigBuilder::new()
-                .set_location_level(LevelFilter::Debug)
-                .build(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        );
-        let rpc = Arc::new(RpcClient::new("https://ssc-dao.genesysgo.net".to_string()));
-
-        let usdh_mint = static_pubkey!("USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX");
-        let msol_mint = static_pubkey!("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
-
-        let payer = Keypair::new();
-        let vault_pda = static_pubkey!("663B7xaCqkFKeRKbWwbzcdXoeBLwNS1k5uDFVgUkZwh9");
-        let vault = static_pubkey!("HvRLN4NtVojvM6MicHVnUWCfBZMVWY4mn147LitM27dE");
-        let management = static_pubkey!("De74LEi2qAz5Lk8XTfm7dTRrhwpJVqbCjehLZSPzKfRN");
-        let anyix_program = static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD");
-        let replacements = HashMap::default();
-        // list markets to remove so we can increase the odds of the route aggregator
-        // returning a whirlpool swap
-        let regex_set: RegexSet =
-            RegexSet::new(&[r"(?i)raydium", r"(?i)serum", r"(?i)lifinity"]).unwrap();
-        super::swap::new_anyix_swap(
-            &rpc,
-            &payer,
-            anyix_program,
-            management,
-            vault,
-            vault_pda,
-            msol_mint,
-            usdh_mint,
-            10.0,
-            false,
-            2,
-            Some(regex_set),
-            &replacements,
-            Slippage::TwentyBip,
-            false,
-            API::V6,
-        );
     }
     #[test]
     #[allow(unused_must_use)]
@@ -275,121 +229,5 @@ mod test {
                 old.pubkey
             );
         }
-    }
-    #[test]
-    #[allow(unused_must_use)]
-    fn test_new_anyix_swap_v6() {
-        TermLogger::init(
-            LevelFilter::Debug,
-            ConfigBuilder::new()
-                //.set_location_level(LevelFilter::Debug)
-                .build(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        );
-        let rpc = Arc::new(RpcClient::new("https://ssc-dao.genesysgo.net".to_string()));
-        let orca_mint = static_pubkey!("orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE");
-        let msol_mint = static_pubkey!("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So");
-        let hbb_mint = static_pubkey!("HBB111SCo9jkCejsZfz8Ec8nH7T6THF8KEKSnvwT6XK6");
-        let mnde_mint = static_pubkey!("MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey");
-        let usdh_mint = static_pubkey!("USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX");
-        /* simiulate a USDH-mSOL Whirlpool swap
-
-        * this gives ORCA, HBB, MNDE rewards + fees
-        * requires USDH-mSOL liquidity
-
-        */
-
-        let payer = Keypair::new();
-        let vault_pda = static_pubkey!("663B7xaCqkFKeRKbWwbzcdXoeBLwNS1k5uDFVgUkZwh9");
-        let vault = static_pubkey!("HvRLN4NtVojvM6MicHVnUWCfBZMVWY4mn147LitM27dE");
-        let management = static_pubkey!("De74LEi2qAz5Lk8XTfm7dTRrhwpJVqbCjehLZSPzKfRN");
-        let anyix_program = static_pubkey!("TLPv2haaXncGsurtzQb4rMnFvuPJto4mntAa51PidhD");
-        let mut replacements = HashMap::default();
-
-        replacements.insert(
-            spl_associated_token_account::get_associated_token_address(&vault_pda, &usdh_mint),
-            derive_tokena_compound_queue(vault, usdh_mint).0,
-        );
-        replacements.insert(
-            spl_associated_token_account::get_associated_token_address(&vault_pda, &mnde_mint),
-            derive_tokenb_compound_queue(vault, mnde_mint).0,
-        );
-
-        super::swap::new_anyix_swap(
-            &rpc,
-            &payer,
-            anyix_program,
-            management,
-            vault,
-            vault_pda,
-            orca_mint,
-            usdh_mint,
-            1.0,
-            false,
-            2,
-            None,
-            &replacements,
-            Slippage::TwentyBip,
-            false,
-            API::V6,
-        );
-
-        super::swap::new_anyix_swap(
-            &rpc,
-            &payer,
-            anyix_program,
-            management,
-            vault,
-            vault_pda,
-            orca_mint,
-            usdh_mint,
-            1.0,
-            false,
-            2,
-            None,
-            &Default::default(),
-            Slippage::TwentyBip,
-            false,
-            API::V6,
-        );
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        super::swap::new_anyix_swap(
-            &rpc,
-            &payer,
-            anyix_program,
-            management,
-            vault,
-            vault_pda,
-            mnde_mint,
-            msol_mint,
-            1.0,
-            false,
-            2,
-            Some(MARKET_BLACKLIST.clone()),
-            &Default::default(),
-            Slippage::TwentyBip,
-            false,
-            API::V6,
-        );
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        super::swap::new_anyix_swap(
-            &rpc,
-            &payer,
-            anyix_program,
-            management,
-            vault,
-            vault_pda,
-            hbb_mint,
-            usdh_mint,
-            1.0,
-            false,
-            2,
-            None,
-            &Default::default(),
-            Slippage::TwentyBip,
-            true,
-            API::V6,
-        );
     }
 }

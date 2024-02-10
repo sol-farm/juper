@@ -1,9 +1,6 @@
 //! provides functions to create AnyIx jupiter swaps using the swap api
 use crate::{
-    api::API,
-    slippage::{FeeBps, Slippage},
-    types::{Quote, SwapConfig},
-    utils::decompile_transaction_instructions,
+    quote_types::{QuoteResponse, RequestOption}, slippage::{FeeBps, Slippage}, utils::decompile_transaction_instructions
 };
 use anchor_lang::solana_program::pubkey::Pubkey;
 use anchor_lang::InstructionData;
@@ -46,7 +43,7 @@ pub struct JupiterAnyIxSwap {
 /// their individual instructions, and then encode the swap related
 /// instructions into the AnyIx instruction format
 pub fn new_anyix_swap_ix_with_quote(
-    swap_route: Quote,
+    swap_route: QuoteResponse,
     rpc: &Arc<RpcClient>,
     payer: &dyn Signer,
     anyix_program: Pubkey,
@@ -60,37 +57,23 @@ pub fn new_anyix_swap_ix_with_quote(
     fail_on_setup: bool,
     input_mint: Pubkey,
     output_mint: Pubkey,
-    version: API,
 ) -> Result<JupiterAnyIxSwap> {
-    let jup_client = crate::Client::new();
-    let swap_config = jup_client.swap_with_config(
+    let jup_client = crate::Client::new()?;
+    let swap_response = jup_client.new_swap(
         swap_route,
-        vault_pda,
-        SwapConfig {
-            wrap_unwrap_sol: Some(false),
-            ..Default::default()
-        },
-        version,
+        &vault_pda.to_string(),
+        false
     )?;
-
-    let crate::types::Swap {
-        setup,
-        mut swap,
-        cleanup,
-    } = swap_config;
     let mut jup_any_ix = JupiterAnyIxSwap::default();
-    if setup.is_some() && !fail_on_setup {
-        if let Some(setup) = setup {
-            jup_any_ix.setup = Some(decompile_transaction_instructions(setup)?)
-        }
-    } else if setup.is_some() && fail_on_setup {
-        return Err(anyhow!("abort on transaction setup enabled"));
+    if !swap_response.setup_instructions.is_empty() {
+        jup_any_ix.setup = Some(swap_response.setup_instructions.iter().filter_map(|ix| ix.to_instruction().ok()).collect::<Vec<_>>())
     }
-
+    let swap_tx = swap_response.new_transaction(rpc, payer.pubkey(), None, None, input_mint)?;
+    let mut tx = Transaction::new(&[payer], swap_tx, rpc.get_latest_blockhash()?);
     jup_any_ix.swap = match process_transaction(
         rpc,
         payer,
-        &mut swap,
+        &mut tx,
         vault,
         anyix_program,
         management,
@@ -105,9 +88,6 @@ pub fn new_anyix_swap_ix_with_quote(
             return Err(anyhow!("{}", error_msg));
         }
     };
-    if cleanup.is_some() {
-        log::warn!("transaction cleanup not yet supported");
-    }
     Ok(jup_any_ix)
 }
 
@@ -129,7 +109,7 @@ pub fn new_anyix_swap_ix_with_quote(
 /// jupiter's swap api requires setup, an error is returned, advancing
 /// the `max_tries` count by 1.
 pub fn new_anyix_swap_with_quote(
-    swap_route: Quote,
+    swap_route: crate::quote_types::QuoteResponse,
     rpc: &Arc<RpcClient>,
     payer: &dyn Signer,
     anyix_program: Pubkey,
@@ -141,7 +121,6 @@ pub fn new_anyix_swap_with_quote(
     fail_on_setup: bool,
     input_mint: Pubkey,
     output_mint: Pubkey,
-    version: API,
 ) -> Result<Signature> {
     let jup_any_ix = new_anyix_swap_ix_with_quote(
         swap_route,
@@ -155,7 +134,6 @@ pub fn new_anyix_swap_with_quote(
         fail_on_setup,
         input_mint,
         output_mint,
-        version,
     )?;
     let jup_swap_ix = if let Some(swap_ix) = jup_any_ix.swap {
         swap_ix
@@ -222,6 +200,7 @@ pub fn new_anyix_swap_with_quote(
 /// jupiter's swap api requires setup, an error is returned, advancing
 /// the `max_tries` count by 1.
 pub fn new_anyix_swap(
+    client: Arc<crate::Client>,
     rpc: &Arc<RpcClient>,
     payer: &dyn Signer,
     anyix_program: Pubkey,
@@ -237,11 +216,14 @@ pub fn new_anyix_swap(
     replacements: &HashMap<Pubkey, Pubkey>,
     slippage: Slippage,
     fail_on_setup: bool,
-    version: API,
 ) -> Result<Signature> {
-    let quoter = crate::quoter::Quoter::new(rpc, input_mint, output_mint)?;
-    let route = quoter
-        .lookup_routes2(input_amount, false, slippage, FeeBps::Zero, version)?;
+    let quoter = crate::route_cache::Quoter::new(rpc, input_mint, output_mint)?;
+    let route = client.new_quote(
+        &input_mint.to_string(),
+        &output_mint.to_string(),
+        spl_token::ui_amount_to_amount(input_amount, quoter.input_mint_decimals),
+        &[RequestOption::AsLegacyTransaction]
+    )?;
     match new_anyix_swap_with_quote(
         route,
         rpc,
@@ -255,7 +237,6 @@ pub fn new_anyix_swap(
         fail_on_setup,
         input_mint,
         output_mint,
-        version,
     ) {
         Ok(sig) => return Ok(sig),
         Err(err) => {

@@ -1,19 +1,24 @@
 use std::collections::HashMap;
 
+use anyhow::anyhow;
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{program_pack::Pack, pubkey::Pubkey};
 
-use crate::{
-    api::API,
-    quoter::Quoter,
-    slippage::{FeeBps, Slippage},
-    types::Quote,
-};
+use crate::{quote_types::{QuoteResponse, RequestOption}, slippage::Slippage};
 use std::sync::{Arc, RwLock};
+
+#[derive(Clone, Copy)]
+pub struct Quoter {
+ pub input_mint: Pubkey,
+ pub output_mint: Pubkey,
+ pub input_mint_decimals: u8,
+ pub output_mint_decimals: u8,
+}
+
 
 #[derive(Clone)]
 pub struct WrappedQuote {
-    pub quote: Quote,
+    pub quote: QuoteResponse,
     pub stale: bool,
 }
 
@@ -29,6 +34,7 @@ pub struct RouteCacheEntry {
 pub struct RouteCache {
     pub routes: Arc<RwLock<HashMap<(Pubkey, Pubkey), RouteCacheEntry>>>,
     pub quoters: Arc<RwLock<HashMap<(Pubkey, Pubkey), Quoter>>>,
+    c: Arc<crate::Client>
 }
 
 impl RouteCache {
@@ -36,6 +42,7 @@ impl RouteCache {
         Self {
             routes: Arc::new(RwLock::new(HashMap::with_capacity(size))),
             quoters: Arc::new(RwLock::new(HashMap::with_capacity(size))),
+            c: Arc::new(crate::Client::new().unwrap())
         }
     }
     pub fn mark_routes_stale(
@@ -60,7 +67,6 @@ impl RouteCache {
         tokens: &[(Pubkey /*input */, Pubkey /*output */)],
         slippage: Slippage,
         ui_amount: f64,
-        version: API,
     ) -> anyhow::Result<()> {
         for (input, output) in tokens.iter() {
             let quoter = if let Some(quoter) = self.quoters.read().unwrap().get(&(*input, *output))
@@ -69,9 +75,12 @@ impl RouteCache {
             } else {
                 Quoter::new(rpc, *input, *output)?
             };
-            let routes = quoter
-                .lookup_routes(ui_amount, false, slippage, FeeBps::Zero, version)
-                .await?;
+            let routes = self.c.new_quote(
+                &quoter.input_mint.to_string(),
+                &quoter.output_mint.to_string(),
+                spl_token::ui_amount_to_amount(ui_amount, quoter.input_mint_decimals),
+                &[RequestOption::AsLegacyTransaction]
+            )?;
             match self.routes.write() {
                 Ok(mut entry_lock) => {
                     if let Some(cache_entry) = entry_lock.get_mut(&(*input, *output)) {
@@ -130,5 +139,35 @@ impl RouteCache {
             }
             Err(err) => Err(anyhow::anyhow!("failed to lock cache {:#?}", err)),
         }
+    }
+}
+
+
+impl Quoter {
+    pub fn new(
+        rpc: &RpcClient,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+    ) -> anyhow::Result<Self> {
+        let input_mint_decimals = match rpc.get_account_data(&input_mint) {
+            Ok(data) => match spl_token::state::Mint::unpack_unchecked(&data[..]) {
+                Ok(dec) => dec.decimals,
+                Err(err) => return Err(anyhow!("failed to unpack input mint {err:#?}")),
+            },
+            Err(err) => return Err(anyhow!("failed to fetch input mint account")),
+        };
+        let output_mint_decimals = match rpc.get_account_data(&output_mint) {
+            Ok(data) => match spl_token::state::Mint::unpack_unchecked(&data[..]) {
+                Ok(dec) => dec.decimals,
+                Err(err) => return Err(anyhow!("failed to unpack output mint {err:#?}")),
+            },
+            Err(err) => return Err(anyhow!("failed to fetch output mint account")),
+        };
+        Ok(Self {
+            input_mint,
+            output_mint,
+            input_mint_decimals,
+            output_mint_decimals,
+        })
     }
 }

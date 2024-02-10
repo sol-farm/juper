@@ -1,302 +1,184 @@
-use crate::api::JupAPI;
-
-use api::API;
 use solana_sdk::{pubkey::Pubkey, transaction::Transaction};
 
 //pub mod core;
 pub mod anyix;
-pub mod api;
-pub mod error;
-mod field_as_string;
-pub mod quoter;
 pub mod route_cache;
 pub mod slippage;
-pub mod types;
 pub mod utils;
+pub mod price_types;
+pub mod quote_types;
+pub mod swap_types;
+pub mod swapper;
 
-use types::{Price, Quote, Response, RouteMap, Swap, SwapConfig, SwapRequest, SwapResponse};
+use std::collections::HashMap;
 
-#[derive(Clone, Copy)]
-/// Implements a blocking client for the Jupiter Aggregator.
-pub struct Client;
+use anyhow::{anyhow, Context};
+use reqwest::StatusCode;
 
-#[derive(Clone, Copy)]
-/// Implements a non blocking client for the Jupiter aggregator
-pub struct AsyncClient;
+use {
+    price_types::{format_price_url, PriceResponse},
+    quote_types::{format_quote_url, QuoteResponse, RequestOption},
+    swap_types::{SwapRequest, SwapResponse, SWAP_BASE},
+};
+
+pub struct Client {
+    c: reqwest::blocking::Client,
+}
 
 impl Client {
-    pub fn new() -> Self {
-        Self
+    pub fn new() -> anyhow::Result<Self> {
+        Ok(Self {
+            c: reqwest::blocking::ClientBuilder::new()
+                .build()?,
+        })
     }
-    /// Get swap serialized transactions for a quote
-    pub fn swap_with_config(
+    pub fn retrieve_token_list(&self) -> anyhow::Result<HashMap<String, TokenListEntry>> {
+        let request = self
+            .c
+            .get("https://token.jup.ag/all")
+            .header("Content-Type", "application/json")
+            .build()?;
+        Ok(self
+            .c
+            .execute(request)?
+            .json::<Vec<TokenListEntry>>()?
+            .into_iter()
+            .map(|t| (t.address.clone(), t))
+            .collect())
+    }
+    pub fn new_quote(
         &self,
-        route: Quote,
-        user_public_key: Pubkey,
-        swap_config: SwapConfig,
-        version: API,
-    ) -> anyhow::Result<Swap> {
-        version.swap(route, user_public_key, swap_config)
-    }
-    /// Get swap serialized transactions for a quote using `SwapConfig` defaults
-    pub fn swap(
-        &self,
-        route: Quote,
-        user_public_key: Pubkey,
-        version: API,
-    ) -> anyhow::Result<Swap> {
-        self.swap_with_config(route, user_public_key, SwapConfig::default(), version)
-    }
-    /// Returns a hash map, input mint as key and an array of valid output mint as values
-    pub fn route_map(&self, only_direct_routes: bool, version: API) -> anyhow::Result<RouteMap> {
-        version.route_map(only_direct_routes)
-    }
-    /// Get quote for a given input mint, output mint and amount
-    pub fn quote(
-        &self,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
+        input_mint: &str,
+        output_mint: &str,
         amount: u64,
-        only_direct_routes: bool,
-        slippage: crate::slippage::Slippage,
-        fees_bps: crate::slippage::FeeBps,
-        version: API,
-    ) -> anyhow::Result<Response<Quote>> {
-        version.quote(
-            input_mint,
-            output_mint,
-            amount,
-            only_direct_routes,
-            slippage,
-            fees_bps,
-        )
-    }
-    /// Get simple price for a given input mint, output mint and amount
-    pub fn price(
-        &self,
-        input_mints: &[Pubkey],
-        output_mint: Pubkey,
-        ui_amount: Option<f64>,
-        version: API,
-    ) -> anyhow::Result<Vec<Price>> {
-        version.price(input_mints, output_mint, ui_amount)
-    }
-    pub fn batch_price_lookup(
-        &self,
-        input_mints: &[Pubkey],
-        output_mint: Pubkey,
-        ui_amount: Option<f64>,
-        v6: bool,
-        version: API,
-    ) -> anyhow::Result<Vec<Price>> {
-        let input_len = input_mints.len();
-        if input_len <= 10 {
-            return version.price(input_mints, output_mint, ui_amount);
-        } else {
-            let chunks = input_mints.chunks(10);
-            let mut prices = Vec::with_capacity(input_len);
-            chunks.into_iter().for_each(|chunk| {
-                if let Ok(price_infos) = version.price(chunk, output_mint, ui_amount) {
-                    prices.extend_from_slice(&price_infos[..]);
-                }
-            });
-            Ok(prices)
+        request_options: &[RequestOption<'_>],
+    ) -> anyhow::Result<QuoteResponse> {
+        let request_url = format_quote_url(input_mint, output_mint, amount, request_options);
+        let request = self
+            .c
+            .get(request_url)
+            .header("Content-Type", "application/json")
+            .build()?;
+        let res = self
+            .c
+            .execute(request)
+            .with_context(|| "failed to execute quote lookup")?;
+        if res.status().ne(&StatusCode::OK) {
+            return Err(anyhow!("quote lookup failed {}", res.text()?));
         }
+        Ok(res
+            .json()
+            .with_context(|| "failed to decode quote lookup response")?)
     }
-    pub async fn async_batch_price_lookup(
+    pub fn new_swap(
         &self,
-        input_mints: &[Pubkey],
-        output_mint: Pubkey,
-        ui_amount: Option<f64>,
-        version: API,
-    ) -> anyhow::Result<Vec<Price>> {
-        let input_len = input_mints.len();
-        if input_len <= 10 {
-            return Ok(version
-                .async_price(input_mints, output_mint, ui_amount)
-                .await?);
-        } else {
-            let chunks = input_mints.chunks(10);
-            let mut prices = Vec::with_capacity(input_len);
-            for chunk in chunks {
-                if let Ok(price_infos) = version.async_price(chunk, output_mint, ui_amount).await {
-                    prices.extend_from_slice(&price_infos[..]);
-                }
-            }
-            Ok(prices)
-        }
-    }
-}
-
-impl AsyncClient {
-    pub fn new() -> Self {
-        Self
-    }
-    /// Get swap serialized transactions for a quote
-    pub async fn swap_with_config(
-        &self,
-        route: Quote,
-        user_public_key: Pubkey,
-        swap_config: SwapConfig,
-        version: API,
-    ) -> anyhow::Result<Swap> {
-        match version {
-            API::V6 => {
-                crate::api::API::V6
-                    .async_swap(route, user_public_key, swap_config)
-                    .await
-            }
-        }
-    }
-    /// Get swap serialized transactions for a quote using `SwapConfig` defaults
-    pub async fn swap(
-        &self,
-        route: Quote,
-        user_public_key: Pubkey,
-        version: API,
-    ) -> anyhow::Result<Swap> {
-        let conf = SwapConfig {
-            wrap_unwrap_sol: Some(false),
+        quote: QuoteResponse,
+        user_public_key: &str,
+        wrap_unwrap_sol: bool,
+    ) -> anyhow::Result<SwapResponse> {
+        let req_body = SwapRequest {
+            user_public_key: user_public_key.to_string(),
+            wrap_and_unwrap_sol: wrap_unwrap_sol,
+            quote_response: quote,
             ..Default::default()
         };
-        self.swap_with_config(route, user_public_key, conf, version)
-            .await
-    }
-    /// Returns a hash map, input mint as key and an array of valid output mint as values
-    pub async fn route_map(
-        &self,
-        only_direct_routes: bool,
-        version: API,
-    ) -> anyhow::Result<RouteMap> {
-        match version {
-            API::V6 => {
-                crate::api::API::V6
-                    .async_route_map(only_direct_routes)
-                    .await
-            }
+
+        let request = self
+            .c
+            .post(SWAP_BASE)
+            .header("Content-Type", "application/json")
+            .json(&req_body)
+            .build()?;
+        let res = self
+            .c
+            .execute(request)
+            .with_context(|| "failed to execute new_swap")?;
+        if res.status().ne(&StatusCode::OK) {
+            return Err(anyhow!("new_swap failed {}", res.text()?));
         }
+        Ok(res
+            .json()
+            .with_context(|| "failed to deserialize new_swap response")?)
     }
-    /// Get quote for a given input mint, output mint and amount
-    pub async fn quote(
+    pub fn price_query(
         &self,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
-        amount: u64,
-        only_direct_routes: bool,
-        slippage: crate::slippage::Slippage,
-        fees_bps: crate::slippage::FeeBps,
-        version: API,
-    ) -> anyhow::Result<Response<Quote>> {
-        match version {
-            API::V6 => {
-                crate::api::API::V6
-                    .async_quote(
-                        input_mint,
-                        output_mint,
-                        amount,
-                        only_direct_routes,
-                        slippage,
-                        fees_bps,
-                    )
-                    .await
-            }
+        input_mint: &str,
+        output_mint: &str,
+    ) -> anyhow::Result<PriceResponse> {
+        let request = self
+            .c
+            .get(format_price_url(input_mint, output_mint))
+            .header("Content-Type", "application/json")
+            .build()?;
+        let res = self
+            .c
+            .execute(request)
+            .with_context(|| "failed to execute price query")?;
+        if res.status().ne(&StatusCode::OK) {
+            return Err(anyhow!("price lookup failed {}", res.text()?));
         }
-    }
-    /// Get simple price for a given input mint, output mint and amount
-    pub async fn price(
-        &self,
-        input_mints: &[Pubkey],
-        output_mint: Pubkey,
-        ui_amount: Option<f64>,
-        version: API,
-    ) -> anyhow::Result<Vec<Price>> {
-        match version {
-            API::V6 => {
-                crate::api::API::V6
-                    .async_price(input_mints, output_mint, ui_amount)
-                    .await
-            }
-        }
+        Ok(res
+            .json()
+            .with_context(|| "faled to deserialize price query")?)
     }
 }
 
-impl Default for Client {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Default for AsyncClient {
-    fn default() -> Self {
-        Self::new()
-    }
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenListEntry {
+    pub address: String,
+    pub chain_id: i64,
+    pub decimals: i64,
+    pub name: String,
+    pub symbol: String,
+    #[serde(rename = "logoURI")]
+    pub logo_uri: Option<String>,
+    pub tags: Vec<String>,
 }
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use super::JupAPI;
     use super::*;
     #[test]
-    fn test_jupapi_v6() {
-        let prices = Client::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V6,
-            )
-            .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-
-        let prices = Client::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V6,
-            )
-            .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
+    fn test_token_list() {
+        let client = Client::new().unwrap();
+        let tokens = client.retrieve_token_list().unwrap();
+        println!(
+            "{:#?}",
+            tokens
+                .get("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+                .unwrap()
+        );
     }
-    #[tokio::test]
-    async fn test_jupapi_v6_async() {
-        let prices = AsyncClient::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V6,
+    #[test]
+    fn test_jlp_usdc_swap() {
+        let client = Client::new().unwrap();
+
+        let response = client
+            .new_quote(
+                "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4",
+                "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                1000000,
+                &[RequestOption::SlippageBps(100)],
             )
-            .await
-            .expect("failed to query price");
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
-        let prices = AsyncClient::new()
-            .price(
-                &[
-                    Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-                    Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                ],
-                Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-                None,
-                API::V6,
-            )
-            .await
             .unwrap();
-        assert!(prices.len() == 2);
-        println!("{:#?}", prices);
+
+        let response = client
+            .new_swap(
+                response,
+                "5WVCN6gmtCMt61W47aaQ9ByA3Lvfn85ALtTD2VQhLrdx",
+                true,
+            )
+            .unwrap();
+        let response = serde_json::to_string_pretty(&response).unwrap();
+        //println!("{}", response);
+
+        let price_response = client
+            .price_query(
+                "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4",
+                "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            )
+            .unwrap();
+        println!("{:#?}", price_response);
     }
 }
