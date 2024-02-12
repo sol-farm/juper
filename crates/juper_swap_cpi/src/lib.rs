@@ -45,7 +45,15 @@ pub fn process_instructions<'info>(
     // ensure an acceptable programId is being used
     assert!(JUPITER_AGG_IDS.contains(jupiter_program_account.key));
     if jupiter_program_account.key.eq(&JUPITER_V6_AGG_ID) {
-        return process_v6_swap(&remaining_accounts, jupiter_program_account, Default::default(), Default::default(), Default::default(), data, seeds);
+        return process_v6_swap(
+            &remaining_accounts,
+            jupiter_program_account,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            data,
+            seeds,
+        );
     }
 
     let any_ix = anyix::AnyIx::unpack(data)?;
@@ -118,13 +126,27 @@ pub fn process_v6_swap<'info>(
     // verify the instruction sighash is a genuine one and expected
     let ix = V6Instructions::try_from(&data[0..8].try_into().unwrap()).unwrap();
     // validate the input accounts, notably signer, source+destination user token account owners
-    ix.validate_accounts(remaining_accounts, wanted_transfer_authority, want_user_source_token_account_owner, wanted_user_destination_token_account_owner);
+    ix.validate_accounts(
+        remaining_accounts,
+        wanted_transfer_authority,
+        want_user_source_token_account_owner,
+        wanted_user_destination_token_account_owner,
+    );
     let accounts: Vec<AccountMeta> = remaining_accounts
         .iter()
-        .map(|acc| AccountMeta {
-            pubkey: *acc.key,
-            is_signer: acc.is_signer,
-            is_writable: acc.is_writable,
+        .map(|acc| {
+            // we need to override the user transfer authority as the signer account
+            // because when initializing the instruction off-chain we have to set it to false
+            let is_signer = if acc.key.eq(&wanted_transfer_authority) {
+                true
+            } else {
+                false
+            };
+            AccountMeta {
+                pubkey: *acc.key,
+                is_signer,
+                is_writable: acc.is_writable,
+            }
         })
         .collect();
 
