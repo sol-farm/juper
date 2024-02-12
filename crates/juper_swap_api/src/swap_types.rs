@@ -127,7 +127,6 @@ impl SwapResponse {
             }
         });
         instructions.push(swap_ix);
-        log::info!("instructions {instructions:#?}");
         // omit cleanup
         Ok(Transaction::new_with_payer(&instructions, Some(&payer)))
     }
