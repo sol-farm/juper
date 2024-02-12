@@ -59,22 +59,17 @@ pub fn new_anyix_swap_ix_with_quote(
     output_mint: Pubkey,
 ) -> Result<JupiterAnyIxSwap> {
     let jup_client = crate::Client::new()?;
-    log::info!("getting swap response");
     let swap_response = jup_client.new_swap(
         swap_route,
         &vault_pda.to_string(),
         false
     )?;
-    log::info!("swap response {swap_response:#?}");
     let mut jup_any_ix = JupiterAnyIxSwap::default();
     //if !swap_response.setup_instructions.is_empty() {
     //    jup_any_ix.setup = Some(swap_response.setup_instructions.iter().filter_map(|ix| ix.to_instruction().ok()).collect::<Vec<_>>())
     //}
-    log::info!("creating txn");
     let mut tx = swap_response.new_transaction(rpc, payer.pubkey(), None, None, input_mint)?;
-    log::info!("signign txn {tx:#?}");
     tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
-    log::info!("processing txn");
     jup_any_ix.swap = match process_transaction(
         rpc,
         payer,
