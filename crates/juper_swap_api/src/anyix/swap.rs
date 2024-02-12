@@ -68,26 +68,13 @@ pub fn new_anyix_swap_ix_with_quote(
     //if !swap_response.setup_instructions.is_empty() {
     //    jup_any_ix.setup = Some(swap_response.setup_instructions.iter().filter_map(|ix| ix.to_instruction().ok()).collect::<Vec<_>>())
     //}
-    let mut tx = swap_response.new_transaction(rpc, payer.pubkey(), None, None, input_mint)?;
-    tx.sign(&vec![payer], rpc.get_latest_blockhash()?);
-    jup_any_ix.swap = match process_transaction(
-        rpc,
-        payer,
-        &mut tx,
-        vault,
-        anyix_program,
-        management,
-        replacements,
-        input_mint,
-        output_mint,
-    ) {
-        Ok(ix) => Some(ix),
-        Err(err) => {
-            let error_msg = format!("tx process failed {:#?}", err);
-            log::debug!("{}", error_msg);
-            return Err(anyhow!("{}", error_msg));
+    let mut swap_ix = swap_response.swap_instruction.to_instruction()?;
+    swap_ix.accounts.iter_mut().for_each(|acct| {
+        if acct.is_signer && acct.pubkey != payer.pubkey() {
+            acct.is_signer = false;
         }
-    };
+    });
+    jup_any_ix.swap = Some(swap_ix);
     Ok(jup_any_ix)
 }
 
